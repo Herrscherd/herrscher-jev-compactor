@@ -139,7 +139,10 @@ func TestProbeTimeoutIsDegraded(t *testing.T) {
 		if _, err := io.Copy(io.Discard, r.Body); err != nil {
 			return
 		}
-		<-r.Context().Done()
+		select {
+		case <-r.Context().Done():
+		case <-time.After(5 * time.Second):
+		}
 	})
 	tls := httptest.NewTLSServer(hanging)
 	t.Cleanup(tls.Close)
@@ -149,6 +152,20 @@ func TestProbeTimeoutIsDegraded(t *testing.T) {
 	report := testProber(tls.Client()).probe(ctx, access)
 	if report.State != contracts.HealthDegraded || report.Detail.Code != contracts.CodeHealthUnreachable || reason(report) != reasonTimeout {
 		t.Fatalf("probe = %+v, want degraded timeout", report)
+	}
+}
+
+func TestProbeCanceledIsDegraded(t *testing.T) {
+	t.Parallel()
+	answering := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	tls := httptest.NewTLSServer(answering)
+	t.Cleanup(tls.Close)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	access := contracts.ProbeAccess{Config: contracts.PluginConfig{Settings: map[string]string{settingAPIKey: "key", settingEndpoint: tls.URL}}}
+	report := testProber(tls.Client()).probe(ctx, access)
+	if report.State != contracts.HealthDegraded || reason(report) != reasonCanceled {
+		t.Fatalf("probe = %+v, want degraded canceled", report)
 	}
 }
 
