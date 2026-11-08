@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -36,6 +37,7 @@ type fakeJev struct {
 	answers  map[string]float64
 	requests []jevRequest
 	auth     []string
+	echoAuth bool
 }
 
 func (f *fakeJev) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -55,7 +57,11 @@ func (f *fakeJev) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	status := f.status
 	f.mu.Unlock()
 	if status != 0 {
-		http.Error(w, "quota exhausted", status)
+		refusal := "quota exhausted"
+		if f.echoAuth {
+			refusal = "bad credentials: " + r.Header.Get("Authorization")
+		}
+		http.Error(w, refusal, status)
 		return
 	}
 	answers := make(map[string]map[string]float64)
@@ -82,7 +88,7 @@ func (f *fakeJev) askedQuestions() []string {
 	return names
 }
 
-func newTestCompactor(t *testing.T, server *fakeJev, settings map[string]string) *compactor {
+func newTestCompactor(t *testing.T, server http.Handler, settings map[string]string) *compactor {
 	t.Helper()
 	tls := httptest.NewTLSServer(server)
 	t.Cleanup(tls.Close)
@@ -141,7 +147,7 @@ func TestCompactPrunesWhatJevLetsGoAndStopsTheStack(t *testing.T) {
 	if !result.Done || result.TokensMeasured || result.Notice.Code != contracts.CodeCompacted {
 		t.Fatalf("result = %+v, want done, unmeasured, compacted", result)
 	}
-	if result.Note != "Jev pruned 2 tool calls, the history is 40% smaller" {
+	if result.Note != "Jev pruned 2 tool calls, the history is 38% smaller" {
 		t.Fatalf("note = %q", result.Note)
 	}
 	wantAsked := []string{"call_t1", "call_t2", "call_t3", "call_t4", "result_t1", "result_t2", "result_t3", "result_t4"}
@@ -166,7 +172,7 @@ func TestCompactLetsTheNextStageRunWhenTheReductionFallsShort(t *testing.T) {
 	if result.Done {
 		t.Fatalf("result = %+v, want the stack to go on", result)
 	}
-	if result.Note != "Jev pruned 1 tool call, the history is 10% smaller, short of the 25% aimed for, so the next stage runs" {
+	if result.Note != "Jev pruned 1 tool call, the history is 9% smaller, short of the 25% aimed for, so the next stage runs" {
 		t.Fatalf("note = %q", result.Note)
 	}
 }
@@ -205,32 +211,120 @@ func TestCompactWithOnlyPinnedCallsPrunesNothing(t *testing.T) {
 	}
 }
 
-func TestCompactReportsAJevFailureWithoutPruning(t *testing.T) {
+func redirectingJev(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "/elsewhere", http.StatusFound)
+}
+
+func malformedJev(w http.ResponseWriter, _ *http.Request) {
+	if _, err := io.WriteString(w, `{"answers":`); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+func TestCompactFallsBackToTheNextStageWhenJevFails(t *testing.T) {
 	cases := map[string]struct {
-		server *fakeJev
+		server http.Handler
+		tune   func(*options)
 		want   error
 	}{
-		"refused":        {server: &fakeJev{status: http.StatusTooManyRequests}, want: ErrJevRefused},
-		"missing answer": {server: &fakeJev{answers: map[string]float64{"call_t1": 1}}, want: ErrJevMissingAnswer},
+		"refused":         {server: &fakeJev{status: http.StatusUnauthorized, echoAuth: true}, want: ErrJevRefused},
+		"malformed":       {server: http.HandlerFunc(malformedJev), want: ErrJevMalformed},
+		"missing answer":  {server: &fakeJev{answers: map[string]float64{"call_t1": 1}}, want: ErrJevMissingAnswer},
+		"redirected":      {server: http.HandlerFunc(redirectingJev), want: ErrJevRedirected},
+		"history too big": {server: &fakeJev{}, tune: func(o *options) { o.maxStateTokens = 10 }, want: ErrHistoryTooLarge},
+		"no room":         {server: &fakeJev{}, tune: func(o *options) { o.maxRequestTokens = 1 }, want: ErrNoRoomForQuestions},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			stage := newTestCompactor(t, tc.server, nil)
-			editor := &fakeHistory{history: sessionHistory()}
-			_, err := stage.Compact(t.Context(), contracts.CompactRequest{History: editor}, nil)
-			if !errors.Is(err, tc.want) {
-				t.Fatalf("Compact error = %v, want %v", err, tc.want)
+			if tc.tune != nil {
+				tc.tune(&stage.opts)
 			}
-			if notice := contracts.NoticeOf(err); notice.Code != contracts.CodeCompactUnavailable {
-				t.Fatalf("notice = %+v, want CodeCompactUnavailable", notice)
+			if _, err := stage.plan(t.Context(), sessionHistory(), ""); !errors.Is(err, tc.want) {
+				t.Fatalf("plan error = %v, want %v", err, tc.want)
 			}
-			if strings.Contains(err.Error(), "test-key") {
-				t.Fatal("the error leaks the API key")
-			}
-			if len(editor.pruned) != 0 {
-				t.Fatal("a failed Jev call still pruned the history")
-			}
+			assertFallsBack(t, stage)
 		})
+	}
+}
+
+func assertFallsBack(t *testing.T, stage *compactor) {
+	t.Helper()
+	editor := &fakeHistory{history: sessionHistory()}
+	result, err := stage.Compact(t.Context(), contracts.CompactRequest{History: editor}, nil)
+	if err != nil {
+		t.Fatalf("Compact error = %v, want the next stage to run", err)
+	}
+	if result.Done || result.Notice.Code != contracts.CodeCompactUnavailable || !strings.HasPrefix(result.Note, "Jev pruned nothing, the next stage compacts: ") {
+		t.Fatalf("result = %+v, want an unavailable notice and the next stage", result)
+	}
+	if len(editor.pruned) != 0 {
+		t.Fatal("a failed Jev call still pruned the history")
+	}
+}
+
+func TestJevRefusalNeverLeaksTheAPIKey(t *testing.T) {
+	stage := newTestCompactor(t, &fakeJev{status: http.StatusUnauthorized, echoAuth: true}, nil)
+	_, refusal := stage.client.ask(t.Context(), compactionState{}, nil)
+	if !errors.Is(refusal, ErrJevRefused) || !strings.Contains(refusal.Error(), "Bearer "+redactedMarker) {
+		t.Fatalf("ask error = %v, want a refusal echoing the redacted header", refusal)
+	}
+	result, err := stage.Compact(t.Context(), contracts.CompactRequest{History: &fakeHistory{history: sessionHistory()}}, nil)
+	if err != nil {
+		t.Fatalf("Compact: %v", err)
+	}
+	for place, text := range map[string]string{"error": refusal.Error(), "note": result.Note, "notice": fmt.Sprint(result.Notice)} {
+		if strings.Contains(text, "test-key") {
+			t.Errorf("the %s leaks the API key: %s", place, text)
+		}
+	}
+}
+
+func TestCompactFailsWhenItsContextIsCancelled(t *testing.T) {
+	stage := newTestCompactor(t, &fakeJev{answers: sessionAnswers()}, nil)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	editor := &fakeHistory{history: sessionHistory()}
+	if _, err := stage.Compact(ctx, contracts.CompactRequest{History: editor}, nil); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Compact error = %v, want context.Canceled", err)
+	}
+	if len(editor.pruned) != 0 {
+		t.Fatal("a cancelled compaction still pruned the history")
+	}
+}
+
+func TestAskAllReportsTheRefusalNotTheCancelledBatch(t *testing.T) {
+	slowThenRefused := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if strings.Contains(string(body), callQuestionPrefix+"t1") {
+			<-r.Context().Done()
+			return
+		}
+		http.Error(w, "bad credentials", http.StatusUnauthorized)
+	})
+	stage := newTestCompactor(t, slowThenRefused, nil)
+	calls := collectCalls(sessionHistory(), 1)
+	_, err := stage.askAll(t.Context(), compactionState{}, [][]toolCall{{calls[0]}, {calls[1]}})
+	if !errors.Is(err, ErrJevRefused) {
+		t.Fatalf("askAll error = %v, want ErrJevRefused", err)
+	}
+}
+
+func TestCompactCountsMessageTextInTheReduction(t *testing.T) {
+	stage := newTestCompactor(t, &fakeJev{answers: sessionAnswers()}, nil)
+	history := sessionHistory()
+	history.Messages[0].Text = strings.Repeat("a long prompt ", 1000)
+	editor := &fakeHistory{history: history, outcome: contracts.PruneOutcome{Edited: 2, CharsBefore: 1000, CharsAfter: 200}}
+	result, err := stage.Compact(t.Context(), contracts.CompactRequest{History: editor}, nil)
+	if err != nil {
+		t.Fatalf("Compact: %v", err)
+	}
+	if result.Done {
+		t.Fatalf("result = %+v, want the next stage: the text the pruning left alone outweighs the outputs", result)
 	}
 }
 

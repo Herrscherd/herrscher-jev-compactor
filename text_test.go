@@ -7,14 +7,17 @@ import (
 
 func TestEstimateTokensWeighsWordsDigitsAndSymbols(t *testing.T) {
 	cases := map[string]int{
-		"":              0,
-		"hello":         1,
-		"abcdefg":       2,
-		"123":           2,
-		"{}":            2,
-		"go test ./...": 7,
-		"é":             1,
-		"  \n\t ":       0,
+		"":                               0,
+		"hello":                          1,
+		"abcdefg":                        2,
+		"123":                            2,
+		"{}":                             2,
+		"go test ./...":                  7,
+		"é":                              1,
+		"  \n\t ":                        0,
+		strings.Repeat("\U0001F600", 10): 18,
+		strings.Repeat("\u0085", 7):      7,
+		"x\ufeffy\ufeffz":                3,
 	}
 	for text, want := range cases {
 		if got := estimateTokens(text); got != want {
@@ -45,9 +48,10 @@ func TestAbridgeKeepsHeadAndTail(t *testing.T) {
 
 func TestFlatInputKeepsKeyOrder(t *testing.T) {
 	cases := map[string]string{
-		`{"z":"last  word","a":{"n":1}}`: `z=last word a={"n":1}`,
-		`not json`:                       `not json`,
-		`["array"]`:                      `["array"]`,
+		`{"z":"last  word","a":{ "n": 1 }}`: `z=last word a={"a":{"n":1}}`,
+		`{"p":"  padded\t"}`:                `p= padded `,
+		` not  json `:                       ` not json `,
+		`["array"]`:                         `["array"]`,
 	}
 	for input, want := range cases {
 		if got := flatInput(input); got != want {

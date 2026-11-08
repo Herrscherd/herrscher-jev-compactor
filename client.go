@@ -9,11 +9,13 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 )
 
 const (
 	maxResponseBytes = 8 << 20
 	errorBodyRunes   = 200
+	redactedMarker   = "[redacted]"
 )
 
 var (
@@ -26,6 +28,9 @@ var (
 	// ErrJevMissingAnswer is returned when Jev leaves a question without a
 	// probability. Match it with errors.Is.
 	ErrJevMissingAnswer = errors.New("jev left a question unanswered")
+	// ErrJevRedirected is returned when the System One API answers with a
+	// redirect, which the stage never follows. Match it with errors.Is.
+	ErrJevRedirected = errors.New("jev answered with a redirect")
 )
 
 type statusError struct {
@@ -81,7 +86,7 @@ func (c *jevClient) ask(ctx context.Context, state compactionState, questions ma
 		return nil, fmt.Errorf("jev: read response: %w", err)
 	}
 	if response.StatusCode != http.StatusOK {
-		return nil, &statusError{status: response.StatusCode, body: truncate(string(payload), errorBodyRunes)}
+		return nil, &statusError{status: response.StatusCode, body: truncate(c.redacted(string(payload)), errorBodyRunes)}
 	}
 	var decoded jevResponse
 	if err := json.Unmarshal(payload, &decoded); err != nil {
@@ -91,6 +96,17 @@ func (c *jevClient) ask(ctx context.Context, state compactionState, questions ma
 		return nil, fmt.Errorf("%w: no answers", ErrJevMalformed)
 	}
 	return decoded.Answers, nil
+}
+
+func (c *jevClient) redacted(text string) string {
+	if c.apiKey == "" {
+		return text
+	}
+	return strings.ReplaceAll(text, c.apiKey, redactedMarker)
+}
+
+func refuseRedirect(*http.Request, []*http.Request) error {
+	return ErrJevRedirected
 }
 
 func closeBody(body io.Closer) {

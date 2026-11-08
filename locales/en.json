@@ -50,6 +50,11 @@
     "other": "timeout of one Jev request, as a Go duration"
   },
   {
+    "id": "jev.note.failed",
+    "description": "The Jev stage failed for Reason, pruned nothing and lets the next stage of the stack compact",
+    "other": "Jev pruned nothing, the next stage compacts: {{.Reason}}"
+  },
+  {
     "id": "jev.note.no_history",
     "description": "The Jev stage did nothing because the backend of the session cannot edit its history",
     "other": "Jev skipped: the backend of this session cannot edit its history"

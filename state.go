@@ -135,8 +135,11 @@ func (f *stateFitter) fit() (fittedState, error) {
 		{"old calls compacted", f.compactCalls},
 	} {
 		fitted, err := f.shrinkEach(order, stage.shrink)
-		if err != nil || fitted {
-			return f.fitted(stage.name), err
+		if err != nil {
+			return fittedState{}, err
+		}
+		if fitted {
+			return f.fitted(stage.name), nil
 		}
 	}
 	if f.leaveOut(order) {
