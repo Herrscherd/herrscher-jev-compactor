@@ -1,6 +1,7 @@
 package jev
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,6 +44,9 @@ func collectCalls(history contracts.History, preserveRecent int) []toolCall {
 	total := len(history.Messages)
 	for index := range history.Messages {
 		for _, call := range history.Messages[index].Calls {
+			if call.Result == "" {
+				continue
+			}
 			calls = append(calls, toolCall{
 				ref:     "t" + strconv.Itoa(len(calls)+1),
 				source:  call,
@@ -108,18 +112,30 @@ func inputPairs(input string) ([]inputPair, error) {
 			return nil, errInputNotObject
 		}
 		var raw json.RawMessage
-		if err := decoder.Decode(&raw); err != nil {
+		if err = decoder.Decode(&raw); err != nil {
 			return nil, fmt.Errorf("%w: %w", errInputNotObject, err)
 		}
-		pairs = append(pairs, inputPair{key: key, value: rawValueText(raw)})
+		value, err := rawValueText(key, raw)
+		if err != nil {
+			return nil, err
+		}
+		pairs = append(pairs, inputPair{key: key, value: value})
 	}
 	return pairs, nil
 }
 
-func rawValueText(raw json.RawMessage) string {
+func rawValueText(key string, raw json.RawMessage) (string, error) {
 	var text string
 	if json.Unmarshal(raw, &text) == nil {
-		return text
+		return text, nil
 	}
-	return truncate(string(raw), nestedInputRunes)
+	encodedKey, err := encodeJSON(key)
+	if err != nil {
+		return "", err
+	}
+	var compacted bytes.Buffer
+	if err := json.Compact(&compacted, raw); err != nil {
+		return "", fmt.Errorf("%w: %w", errInputNotObject, err)
+	}
+	return truncate("{"+encodedKey+":"+compacted.String()+"}", nestedInputRunes), nil
 }

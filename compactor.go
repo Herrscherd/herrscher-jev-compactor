@@ -2,6 +2,7 @@ package jev
 
 import (
 	"context"
+	"log/slog"
 	"math"
 	"net/http"
 	"strings"
@@ -30,7 +31,15 @@ func (e *unavailableError) Error() string { return "jev compaction: " + e.cause.
 func (e *unavailableError) Unwrap() error { return e.cause }
 
 func (e *unavailableError) Notice() contracts.Notice {
-	reason, _, _ := strings.Cut(e.cause.Error(), "\n")
+	return unavailableNotice(failureReason(e.cause))
+}
+
+func failureReason(cause error) string {
+	reason, _, _ := strings.Cut(cause.Error(), "\n")
+	return reason
+}
+
+func unavailableNotice(reason string) contracts.Notice {
 	return contracts.Notice{
 		Code: contracts.CodeCompactUnavailable,
 		Args: []contracts.Arg{contracts.Text("Reason", reason)},
@@ -48,12 +57,14 @@ func newCompactor(cfg contracts.PluginConfig, texts *messages, httpClient *http.
 	if err != nil {
 		return nil, err
 	}
-	if httpClient == nil {
-		httpClient = &http.Client{Timeout: opts.timeout}
+	refusing := http.Client{Timeout: opts.timeout}
+	if httpClient != nil {
+		refusing = *httpClient
 	}
+	refusing.CheckRedirect = refuseRedirect
 	return &compactor{
 		opts:   opts,
-		client: &jevClient{http: httpClient, endpoint: opts.endpoint, apiKey: opts.apiKey, model: opts.model},
+		client: &jevClient{http: &refusing, endpoint: opts.endpoint, apiKey: opts.apiKey, model: opts.model},
 		texts:  texts,
 	}, nil
 }
@@ -68,7 +79,10 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 	}
 	edits, err := c.plan(ctx, history, req.Instruction)
 	if err != nil {
-		return contracts.CompactResult{}, &unavailableError{cause: err}
+		if ctx.Err() != nil {
+			return contracts.CompactResult{}, &unavailableError{cause: err}
+		}
+		return c.fallback(err), nil
 	}
 	if len(edits) == 0 {
 		return contracts.CompactResult{Note: c.texts.english(noteNothingToPrune, nil)}, nil
@@ -77,14 +91,31 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 	if err != nil {
 		return contracts.CompactResult{}, &unavailableError{cause: err}
 	}
-	return c.result(outcome), nil
+	return c.result(outcome, textRunes(history)), nil
 }
 
-func (c *compactor) result(outcome contracts.PruneOutcome) contracts.CompactResult {
+func (c *compactor) fallback(cause error) contracts.CompactResult {
+	reason := failureReason(cause)
+	slog.Warn("jev: compaction skipped, the next stage runs", "reason", reason)
+	return contracts.CompactResult{
+		Note:   c.texts.english(noteFailed, map[string]any{"Reason": reason}),
+		Notice: unavailableNotice(reason),
+	}
+}
+
+func textRunes(history contracts.History) int {
+	total := 0
+	for index := range history.Messages {
+		total += runeCount(history.Messages[index].Text)
+	}
+	return total
+}
+
+func (c *compactor) result(outcome contracts.PruneOutcome, unchangedRunes int) contracts.CompactResult {
 	if outcome.Edited == 0 {
 		return contracts.CompactResult{Note: c.texts.english(noteNothingToPrune, nil)}
 	}
-	reduction := reductionOf(outcome)
+	reduction := reductionOf(outcome, unchangedRunes)
 	params := map[string]any{"Count": outcome.Edited, "Percent": wholePercent(reduction)}
 	done := reduction >= c.opts.minReduction
 	key := notePruned
@@ -99,11 +130,12 @@ func (c *compactor) result(outcome contracts.PruneOutcome) contracts.CompactResu
 	}
 }
 
-func reductionOf(outcome contracts.PruneOutcome) float64 {
-	if outcome.CharsBefore <= 0 {
+func reductionOf(outcome contracts.PruneOutcome, unchangedRunes int) float64 {
+	before := outcome.CharsBefore + unchangedRunes
+	if before <= 0 {
 		return 0
 	}
-	return float64(outcome.CharsBefore-outcome.CharsAfter) / float64(outcome.CharsBefore)
+	return float64(outcome.CharsBefore-outcome.CharsAfter) / float64(before)
 }
 
 func wholePercent(ratio float64) int {
@@ -125,6 +157,7 @@ func (c *compactor) plan(ctx context.Context, history contracts.History, instruc
 	if err != nil {
 		return nil, err
 	}
+	slog.Debug("jev: state fitted", "stage", fitted.stage, "tokens", fitted.tokens)
 	batches, err := batchCalls(candidates, fitted.tokens, c.opts.maxRequestTokens)
 	if err != nil {
 		return nil, err
@@ -142,35 +175,38 @@ func (c *compactor) plan(ctx context.Context, history contracts.History, instruc
 	return edits, nil
 }
 
-type batchAnswers struct {
-	answers map[string]callAnswer
-	err     error
-}
-
 func (c *compactor) askAll(ctx context.Context, state compactionState, batches [][]toolCall) (map[string]callAnswer, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	results := make([]batchAnswers, len(batches))
+	results := make([]map[string]callAnswer, len(batches))
 	slots := make(chan struct{}, maxParallelRequests)
-	var wg sync.WaitGroup
+	var (
+		wg        sync.WaitGroup
+		firstFail sync.Once
+		failure   error
+	)
 	for index, batch := range batches {
 		wg.Go(func() {
 			slots <- struct{}{}
 			defer func() { <-slots }()
 			answers, err := c.askBatch(ctx, state, batch)
 			if err != nil {
-				cancel()
+				firstFail.Do(func() {
+					failure = err
+					cancel()
+				})
+				return
 			}
-			results[index] = batchAnswers{answers: answers, err: err}
+			results[index] = answers
 		})
 	}
 	wg.Wait()
+	if failure != nil {
+		return nil, failure
+	}
 	merged := make(map[string]callAnswer)
-	for _, result := range results {
-		if result.err != nil {
-			return nil, result.err
-		}
-		for ref, answer := range result.answers {
+	for _, answers := range results {
+		for ref, answer := range answers {
 			merged[ref] = answer
 		}
 	}

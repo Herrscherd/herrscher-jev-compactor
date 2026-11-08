@@ -4,6 +4,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"sync"
 
 	"github.com/Herrscherd/herrscher-contracts/i18n"
@@ -23,6 +24,7 @@ const (
 	helpStateBudget    = "jev.setting.max_state_tokens"
 	helpRequestBudget  = "jev.setting.max_request_tokens"
 	helpTimeout        = "jev.setting.timeout"
+	noteFailed         = "jev.note.failed"
 	noteNoHistory      = "jev.note.no_history"
 	noteNothingToPrune = "jev.note.nothing_to_prune"
 	notePruned         = "jev.note.pruned"
@@ -48,11 +50,13 @@ func loadCatalog() (*i18n.Catalog, error) {
 func (m *messages) english(key string, params map[string]any) string {
 	catalog, err := m.load()
 	if err != nil {
-		return fmt.Sprintf("message %s unavailable: %v", key, err)
+		slog.Warn("jev: load messages", "key", key, "err", err)
+		return key
 	}
 	text, err := catalog.Message(i18n.English, key, params)
 	if err != nil {
-		return fmt.Sprintf("message %s unavailable: %v", key, err)
+		slog.Warn("jev: render message", "key", key, "err", err)
+		return key
 	}
 	return text
 }

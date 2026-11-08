@@ -50,6 +50,11 @@
     "other": "délai d'une requête Jev, en durée Go"
   },
   {
+    "id": "jev.note.failed",
+    "description": "The Jev stage failed for Reason, pruned nothing and lets the next stage of the stack compact",
+    "other": "Jev n'a rien élagué, l'étape suivante compacte : {{.Reason}}"
+  },
+  {
     "id": "jev.note.no_history",
     "description": "The Jev stage did nothing because the backend of the session cannot edit its history",
     "other": "Jev ignoré : le backend de cette session ne sait pas modifier son historique"

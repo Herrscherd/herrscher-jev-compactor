@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
+	"unicode/utf16"
 	"unicode/utf8"
 )
 
@@ -17,6 +18,9 @@ const (
 	tenthsPerToken  = 10
 	ellipsis        = "…"
 	abridgeSlack    = 40
+	nextLine        = '\u0085'
+	byteOrderMark   = '\uFEFF'
+	surrogateUnits  = 2
 )
 
 func estimateTokens(text string) int {
@@ -32,10 +36,10 @@ func estimateTokens(text string) int {
 			run := asciiRun(text[index:], isASCIILetter)
 			tenths += (1 + (run-1)/lettersPerToken) * wordTenths
 			index += run
-		case unicode.IsSpace(char):
+		case isJSSpace(char):
 			index += size
 		default:
-			tenths += symbolTenths
+			tenths += symbolTenths * utf16Units(char)
 			index += size
 		}
 	}
@@ -46,6 +50,17 @@ func isASCIIDigit(char rune) bool { return char >= '0' && char <= '9' }
 
 func isASCIILetter(char rune) bool {
 	return (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z')
+}
+
+func isJSSpace(char rune) bool {
+	return char == byteOrderMark || (char != nextLine && unicode.IsSpace(char))
+}
+
+func utf16Units(char rune) int {
+	if utf16.RuneLen(char) == surrogateUnits {
+		return surrogateUnits
+	}
+	return 1
 }
 
 func asciiRun(text string, accepts func(rune) bool) int {
@@ -100,7 +115,19 @@ func abridge(text string, head, tail int) string {
 }
 
 func collapseSpaces(text string) string {
-	return strings.Join(strings.Fields(text), " ")
+	collapsed := make([]rune, 0, len(text))
+	inSpace := false
+	for _, char := range text {
+		switch {
+		case !isJSSpace(char):
+			collapsed = append(collapsed, char)
+			inSpace = false
+		case !inSpace:
+			collapsed = append(collapsed, ' ')
+			inSpace = true
+		}
+	}
+	return string(collapsed)
 }
 
 func encodeJSON(value any) (string, error) {
