@@ -27,6 +27,12 @@ func TestRegisterDeclaresACompactorStage(t *testing.T) {
 	if _, err := found.Compactor(t.Context(), contracts.PluginConfig{}); !errors.Is(err, ErrMissingAPIKey) {
 		t.Fatalf("factory without a key error = %v, want ErrMissingAPIKey", err)
 	}
+	if found.Probe == nil {
+		t.Fatal("jev registers no probe")
+	}
+	if report := found.Probe(t.Context(), contracts.ProbeAccess{}); report.State != contracts.HealthDown || report.Detail.Code != contracts.CodeHealthEnvMissing {
+		t.Fatalf("probe without a key = %+v, want down and the variable named", report)
+	}
 	stage, err := found.Compactor(t.Context(), contracts.PluginConfig{Settings: map[string]string{settingAPIKey: "key"}})
 	if err != nil || stage == nil {
 		t.Fatalf("factory = %v, %v", stage, err)

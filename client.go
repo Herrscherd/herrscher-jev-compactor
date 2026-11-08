@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const (
@@ -103,6 +104,15 @@ func (c *jevClient) redacted(text string) string {
 		return text
 	}
 	return strings.ReplaceAll(text, c.apiKey, redactedMarker)
+}
+
+func refusingClient(httpClient *http.Client, timeout time.Duration) *http.Client {
+	refusing := http.Client{Timeout: timeout}
+	if httpClient != nil {
+		refusing = *httpClient
+	}
+	refusing.CheckRedirect = refuseRedirect
+	return &refusing
 }
 
 func refuseRedirect(*http.Request, []*http.Request) error {

@@ -115,6 +115,24 @@ a token, any other symbol nine tenths. Symbols are counted in UTF-16 units
 and spaces are the JavaScript `\s` set, as in fast-jev, so a character
 outside the Basic Multilingual Plane costs two symbols.
 
+## Health
+
+The stage answers the host's health probe (`Plugin.Probe`) without building a
+live stage and without compacting anything. The key is read from the plugin
+config first, then from `TYPESAFE_API_KEY`, as the factory reads it.
+
+- No key: Down, with the remedy of adding `TYPESAFE_API_KEY` to the service
+  environment and restarting the service.
+- Key present: one authenticated request to the endpoint with no question and
+  no history, so Jev prunes nothing. A 401 or 403 is Down (credentials
+  refused), a 429 is Degraded (rate limited), a timeout or a 5xx is Degraded
+  (unreachable), a connection failure, a redirect or a 404 is Down
+  (unreachable), and any other answer is OK with the latency of the request.
+
+The reason shown for an unreachable endpoint is a short cause such as
+`timeout` or `http 503`; the key never appears in a notice. `Deep` changes
+nothing: the request is the same with or without it, and it asks Jev nothing.
+
 ## Develop
 
 ```bash
