@@ -1,0 +1,74 @@
+[
+  {
+    "id": "jev.setting.api_key",
+    "description": "Help of the api_key setting: the TypeSafe key Jev is called with",
+    "other": "TypeSafe API key Jev is called with"
+  },
+  {
+    "id": "jev.setting.model",
+    "description": "Help of the model setting",
+    "other": "Jev model asked"
+  },
+  {
+    "id": "jev.setting.endpoint",
+    "description": "Help of the endpoint setting: the https URL of the System One API",
+    "other": "https URL of the System One API"
+  },
+  {
+    "id": "jev.setting.keep_threshold",
+    "description": "Help of the keep_threshold setting",
+    "other": "probability from 0 to 1 at or above which Jev keeps a call or its result"
+  },
+  {
+    "id": "jev.setting.preserve_recent",
+    "description": "Help of the preserve_recent setting",
+    "other": "number of newest messages whose tool calls are never pruned"
+  },
+  {
+    "id": "jev.setting.truncate_head",
+    "description": "Help of the truncate_head setting",
+    "other": "characters kept at the head of a result Jev prunes"
+  },
+  {
+    "id": "jev.setting.min_reduction",
+    "description": "Help of the min_reduction setting",
+    "other": "share of the history from 0 to 1 the stage must remove to stop the compaction stack"
+  },
+  {
+    "id": "jev.setting.max_state_tokens",
+    "description": "Help of the max_state_tokens setting",
+    "other": "token budget of the history sent to Jev"
+  },
+  {
+    "id": "jev.setting.max_request_tokens",
+    "description": "Help of the max_request_tokens setting",
+    "other": "token budget of one Jev request, history and questions together"
+  },
+  {
+    "id": "jev.setting.timeout",
+    "description": "Help of the timeout setting",
+    "other": "timeout of one Jev request, as a Go duration"
+  },
+  {
+    "id": "jev.note.no_history",
+    "description": "The Jev stage did nothing because the backend of the session cannot edit its history",
+    "other": "Jev skipped: the backend of this session cannot edit its history"
+  },
+  {
+    "id": "jev.note.nothing_to_prune",
+    "description": "The Jev stage found no tool call to prune",
+    "other": "Jev found no tool call to prune"
+  },
+  {
+    "id": "jev.note.pruned",
+    "description": "The Jev stage pruned Count tool calls and shrank the history by Percent percent, enough to stop the stack",
+    "one": "Jev pruned {{.Count}} tool call, the history is {{.Percent}}% smaller",
+    "other": "Jev pruned {{.Count}} tool calls, the history is {{.Percent}}% smaller"
+  },
+  {
+    "id": "jev.note.pruned_short",
+    "description": "The Jev stage pruned Count tool calls, but the Percent percent it removed is below its Target percent, so the next stage runs",
+    "one": "Jev pruned {{.Count}} tool call, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the next stage runs",
+    "other": "Jev pruned {{.Count}} tool calls, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the next stage runs"
+  }
+]

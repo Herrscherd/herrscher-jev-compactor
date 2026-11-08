@@ -1,0 +1,58 @@
+package jev
+
+import (
+	"embed"
+	"fmt"
+	"io/fs"
+	"sync"
+
+	"github.com/Herrscherd/herrscher-contracts/i18n"
+)
+
+//go:embed locales
+var localeFiles embed.FS
+
+const (
+	helpAccess         = "jev.setting.api_key"
+	helpModel          = "jev.setting.model"
+	helpEndpoint       = "jev.setting.endpoint"
+	helpKeepThreshold  = "jev.setting.keep_threshold"
+	helpPreserveRecent = "jev.setting.preserve_recent"
+	helpTruncateHead   = "jev.setting.truncate_head"
+	helpMinReduction   = "jev.setting.min_reduction"
+	helpStateBudget    = "jev.setting.max_state_tokens"
+	helpRequestBudget  = "jev.setting.max_request_tokens"
+	helpTimeout        = "jev.setting.timeout"
+	noteNoHistory      = "jev.note.no_history"
+	noteNothingToPrune = "jev.note.nothing_to_prune"
+	notePruned         = "jev.note.pruned"
+	notePrunedShort    = "jev.note.pruned_short"
+)
+
+type messages struct {
+	load func() (*i18n.Catalog, error)
+}
+
+func newMessages() *messages {
+	return &messages{load: sync.OnceValues(loadCatalog)}
+}
+
+func loadCatalog() (*i18n.Catalog, error) {
+	sources, err := fs.Sub(localeFiles, "locales")
+	if err != nil {
+		return nil, fmt.Errorf("jev locales: %w", err)
+	}
+	return i18n.NewCatalog(nil, sources)
+}
+
+func (m *messages) english(key string, params map[string]any) string {
+	catalog, err := m.load()
+	if err != nil {
+		return fmt.Sprintf("message %s unavailable: %v", key, err)
+	}
+	text, err := catalog.Message(i18n.English, key, params)
+	if err != nil {
+		return fmt.Sprintf("message %s unavailable: %v", key, err)
+	}
+	return text
+}

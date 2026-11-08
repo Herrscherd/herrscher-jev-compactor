@@ -1,0 +1,74 @@
+[
+  {
+    "id": "jev.setting.api_key",
+    "description": "Help of the api_key setting: the TypeSafe key Jev is called with",
+    "other": "clé d'API TypeSafe utilisée pour appeler Jev"
+  },
+  {
+    "id": "jev.setting.model",
+    "description": "Help of the model setting",
+    "other": "modèle Jev interrogé"
+  },
+  {
+    "id": "jev.setting.endpoint",
+    "description": "Help of the endpoint setting: the https URL of the System One API",
+    "other": "URL https de l'API System One"
+  },
+  {
+    "id": "jev.setting.keep_threshold",
+    "description": "Help of the keep_threshold setting",
+    "other": "probabilité de 0 à 1 à partir de laquelle Jev garde un appel ou son résultat"
+  },
+  {
+    "id": "jev.setting.preserve_recent",
+    "description": "Help of the preserve_recent setting",
+    "other": "nombre de messages les plus récents dont les appels d'outil ne sont jamais élagués"
+  },
+  {
+    "id": "jev.setting.truncate_head",
+    "description": "Help of the truncate_head setting",
+    "other": "caractères gardés en tête d'un résultat que Jev élague"
+  },
+  {
+    "id": "jev.setting.min_reduction",
+    "description": "Help of the min_reduction setting",
+    "other": "part de l'historique de 0 à 1 que l'étape doit retirer pour arrêter la pile de compaction"
+  },
+  {
+    "id": "jev.setting.max_state_tokens",
+    "description": "Help of the max_state_tokens setting",
+    "other": "budget en tokens de l'historique envoyé à Jev"
+  },
+  {
+    "id": "jev.setting.max_request_tokens",
+    "description": "Help of the max_request_tokens setting",
+    "other": "budget en tokens d'une requête Jev, historique et questions comprises"
+  },
+  {
+    "id": "jev.setting.timeout",
+    "description": "Help of the timeout setting",
+    "other": "délai d'une requête Jev, en durée Go"
+  },
+  {
+    "id": "jev.note.no_history",
+    "description": "The Jev stage did nothing because the backend of the session cannot edit its history",
+    "other": "Jev ignoré : le backend de cette session ne sait pas modifier son historique"
+  },
+  {
+    "id": "jev.note.nothing_to_prune",
+    "description": "The Jev stage found no tool call to prune",
+    "other": "Jev n'a trouvé aucun appel d'outil à élaguer"
+  },
+  {
+    "id": "jev.note.pruned",
+    "description": "The Jev stage pruned Count tool calls and shrank the history by Percent percent, enough to stop the stack",
+    "one": "Jev a élagué {{.Count}} appel d'outil, l'historique est plus court de {{.Percent}} %",
+    "other": "Jev a élagué {{.Count}} appels d'outil, l'historique est plus court de {{.Percent}} %"
+  },
+  {
+    "id": "jev.note.pruned_short",
+    "description": "The Jev stage pruned Count tool calls, but the Percent percent it removed is below its Target percent, so the next stage runs",
+    "one": "Jev a élagué {{.Count}} appel d'outil, l'historique est plus court de {{.Percent}} %, sous les {{.Target}} % visés, donc l'étape suivante s'exécute",
+    "other": "Jev a élagué {{.Count}} appels d'outil, l'historique est plus court de {{.Percent}} %, sous les {{.Target}} % visés, donc l'étape suivante s'exécute"
+  }
+]

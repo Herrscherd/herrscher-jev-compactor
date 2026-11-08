@@ -1,0 +1,9 @@
+*.test
+
+# per-session git worktrees created by `dctl serve`
+/.dctl-sessions/
+
+# CI-generated workspace + fetched sibling deps
+/_deps/
+/go.work
+/go.work.sum
