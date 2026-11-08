@@ -42,11 +42,11 @@ func TestEveryMessageRendersInEveryLanguage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewCatalog: %v", err)
 	}
-	params := map[string]any{"Count": 2, "Percent": 30, "Target": 25}
+	params := map[string]any{"Count": 2, "Percent": 30, "Target": 25, "Reason": "x"}
 	keys := []string{
 		helpAccess, helpModel, helpEndpoint, helpKeepThreshold, helpPreserveRecent,
 		helpTruncateHead, helpMinReduction, helpStateBudget, helpRequestBudget,
-		helpTimeout, noteNoHistory, noteNothingToPrune, notePruned, notePrunedShort,
+		helpTimeout, noteNoHistory, noteNothingToPrune, notePruned, notePrunedShort, noteFailed,
 	}
 	for _, lang := range i18n.Languages() {
 		for _, key := range keys {

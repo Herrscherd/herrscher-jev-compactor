@@ -22,12 +22,10 @@ It needs the session's backend to edit its history in place, which a backend
 declares with `Capabilities.HistoryEditor`, and a host that hands the stage a
 `contracts.HistoryEditor` in `CompactRequest.History`. Two releases are
 needed for that: herrscher-claude-backend v0.12.0 or later, the first backend
-to edit its history, and the herrscher host release that fills
-`CompactRequest.History` (the next one). Without both, the stage does nothing,
-returns its `no_history` note, and lets the backend compact.
-
-The status stays live: the stage and the host release that feeds it ship
-together, and until then the stage steps aside on its own.
+to edit its history, and herrscher v0.50.0 or later, the first host to fill
+`CompactRequest.History` and to load compactor plugins named in
+`compactStack`. With an older backend the stage does nothing, returns its
+`no_history` note, and lets the backend compact.
 
 ## Install
 
