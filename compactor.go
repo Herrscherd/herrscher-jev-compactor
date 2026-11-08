@@ -57,14 +57,9 @@ func newCompactor(cfg contracts.PluginConfig, texts *messages, httpClient *http.
 	if err != nil {
 		return nil, err
 	}
-	refusing := http.Client{Timeout: opts.timeout}
-	if httpClient != nil {
-		refusing = *httpClient
-	}
-	refusing.CheckRedirect = refuseRedirect
 	return &compactor{
 		opts:   opts,
-		client: &jevClient{http: &refusing, endpoint: opts.endpoint, apiKey: opts.apiKey, model: opts.model},
+		client: &jevClient{http: refusingClient(httpClient, opts.timeout), endpoint: opts.endpoint, apiKey: opts.apiKey, model: opts.model},
 		texts:  texts,
 	}, nil
 }
