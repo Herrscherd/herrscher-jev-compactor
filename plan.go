@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	contracts "github.com/Herrscherd/herrscher-contracts"
 )
@@ -43,6 +44,31 @@ const (
 	decisionPruneResult
 	decisionPruneCall
 )
+
+const (
+	reasonPinned    = "pinned"
+	reasonRule      = "rule"
+	reasonThreshold = "threshold"
+	reasonBudget    = "budget"
+	reasonError     = "error"
+)
+
+func (d decision) String() string {
+	switch d {
+	case decisionKeep:
+		return "keep"
+	case decisionPruneResult:
+		return "prune_result"
+	case decisionPruneCall:
+		return "prune_call"
+	}
+	return ""
+}
+
+func logDecision(call toolCall, verdict decision, reason string, attrs ...any) {
+	fields := []any{"ref", call.ref, "tool", call.source.Tool, "verdict", verdict.String(), "reason", reason, "result_size", call.resultRunes()}
+	slog.Debug("jev: call decided", append(fields, attrs...)...)
+}
 
 func questionsFor(call toolCall) map[string]question {
 	return map[string]question{
@@ -219,6 +245,9 @@ func (c *compactor) decideLocally(calls []toolCall) (map[string]plannedEdit, []t
 	var asked []toolCall
 	for _, call := range calls {
 		if c.kept(call) {
+			if c.isPinned(call) {
+				logDecision(call, decisionKeep, reasonPinned)
+			}
 			continue
 		}
 		picked := c.opts.policy.ruleFor(call.source.Tool)
@@ -226,7 +255,9 @@ func (c *compactor) decideLocally(calls []toolCall) (map[string]plannedEdit, []t
 			asked = append(asked, call)
 			continue
 		}
-		if edit, ok := c.verdictEdit(call, picked.action.decision(), c.opts.truncationFor(picked), ruleDecided); ok {
+		verdict, flipped := c.keepErrorsVerdict(call, picked.action.decision())
+		logDecision(call, verdict, reasonFor(flipped, reasonRule), "rule", strings.Join(picked.patterns, ","))
+		if edit, ok := c.verdictEdit(call, verdict, c.opts.truncationFor(picked), ruleDecided); ok {
 			decided[call.ref] = edit
 		}
 	}
@@ -237,12 +268,23 @@ func (c *compactor) decideAsked(asked []toolCall, answers map[string]callAnswer,
 	for _, call := range asked {
 		picked := c.opts.policy.ruleFor(call.source.Tool)
 		answer := answers[call.ref]
-		verdict := decideWith(call, answer, c.opts.thresholdsFor(picked))
+		limits := c.opts.thresholdsFor(picked)
+		verdict, flipped := c.keepErrorsVerdict(call, decideWith(call, answer, limits))
+		logDecision(call, verdict, reasonFor(flipped, reasonThreshold),
+			"p_call", answer.keepCall, "p_result", answer.keepResult,
+			"call_threshold", limits.call, "result_threshold", limits.result)
 		keep := max(answer.keepCall, answer.keepResult)
 		if edit, ok := c.verdictEdit(call, verdict, c.opts.truncationFor(picked), keep); ok {
 			decided[call.ref] = edit
 		}
 	}
+}
+
+func reasonFor(flipped bool, reason string) string {
+	if flipped {
+		return reasonError
+	}
+	return reason
 }
 
 func (c *compactor) isPinned(call toolCall) bool {
@@ -266,10 +308,14 @@ func (c *compactor) judge(ctx context.Context, history contracts.History, calls,
 	return c.askAll(ctx, fitted.state, batches)
 }
 
-func (c *compactor) verdictEdit(call toolCall, verdict decision, cut truncation, keep float64) (plannedEdit, bool) {
+func (c *compactor) keepErrorsVerdict(call toolCall, verdict decision) (decision, bool) {
 	if c.opts.keepErrors && call.source.ResultIsError && verdict == decisionPruneCall {
-		verdict = decisionPruneResult
+		return decisionPruneResult, true
 	}
+	return verdict, false
+}
+
+func (c *compactor) verdictEdit(call toolCall, verdict decision, cut truncation, keep float64) (plannedEdit, bool) {
 	edit, prune := editFor(call, verdict, cut)
 	if !prune {
 		return plannedEdit{}, false
@@ -284,5 +330,19 @@ func (c *compactor) withinBudget(history contracts.History, calls []toolCall, de
 			planned = append(planned, edit)
 		}
 	}
-	return fitBudget(planned, c.opts.budget(), historyRunes(history))
+	edits := fitBudget(planned, c.opts.budget(), historyRunes(history))
+	c.logBudgetDemotions(calls, decided, edits)
+	return edits
+}
+
+func (c *compactor) logBudgetDemotions(calls []toolCall, decided map[string]plannedEdit, edits []contracts.HistoryEdit) {
+	kept := make(map[string]bool, len(edits))
+	for _, edit := range edits {
+		kept[edit.CallID] = true
+	}
+	for _, call := range calls {
+		if _, ok := decided[call.ref]; ok && !kept[call.source.ID] {
+			logDecision(call, decisionKeep, reasonBudget)
+		}
+	}
 }

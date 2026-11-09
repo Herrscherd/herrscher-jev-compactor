@@ -186,21 +186,21 @@
   },
   {
     "id": "jev.note.pruned",
-    "description": "The Jev stage pruned Count tool calls and shrank the history by Percent percent, enough to stop the stack",
-    "one": "Jev pruned {{.Count}} tool call, the history is {{.Percent}}% smaller",
-    "other": "Jev pruned {{.Count}} tool calls, the history is {{.Percent}}% smaller"
+    "description": "The Jev stage reviewed Count tool calls: Kept stay, Truncated keep only their head and tail, Pruned are removed, and the history shrank by Percent percent, enough to stop the stack",
+    "one": "Jev reviewed {{.Count}} tool call: {{.Kept}} kept, {{.Truncated}} truncated, {{.Pruned}} removed, the history is {{.Percent}}% smaller",
+    "other": "Jev reviewed {{.Count}} tool calls: {{.Kept}} kept, {{.Truncated}} truncated, {{.Pruned}} removed, the history is {{.Percent}}% smaller"
   },
   {
     "id": "jev.note.pruned_short",
-    "description": "The Jev stage pruned Count tool calls, but the Percent percent it removed is below its Target percent, so the next stage runs",
-    "one": "Jev pruned {{.Count}} tool call, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the next stage runs",
-    "other": "Jev pruned {{.Count}} tool calls, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the next stage runs"
+    "description": "The Jev stage reviewed Count tool calls and removed Percent percent of the history, below its Target percent, so the next stage runs",
+    "one": "Jev reviewed {{.Count}} tool call: {{.Kept}} kept, {{.Truncated}} truncated, {{.Pruned}} removed, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the next stage runs",
+    "other": "Jev reviewed {{.Count}} tool calls: {{.Kept}} kept, {{.Truncated}} truncated, {{.Pruned}} removed, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the next stage runs"
   },
   {
     "id": "jev.note.pruned_stopped",
-    "description": "The Jev stage pruned Count tool calls, the Percent percent it removed is below its Target percent, and on_short=done stops the stack here",
-    "one": "Jev pruned {{.Count}} tool call, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the stack stops here",
-    "other": "Jev pruned {{.Count}} tool calls, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the stack stops here"
+    "description": "The Jev stage reviewed Count tool calls and removed Percent percent of the history, below its Target percent, and on_short=done stops the stack here",
+    "one": "Jev reviewed {{.Count}} tool call: {{.Kept}} kept, {{.Truncated}} truncated, {{.Pruned}} removed, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the stack stops here",
+    "other": "Jev reviewed {{.Count}} tool calls: {{.Kept}} kept, {{.Truncated}} truncated, {{.Pruned}} removed, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the stack stops here"
   },
   {
     "id": "jev.note.dry_run",

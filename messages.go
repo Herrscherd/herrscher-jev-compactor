@@ -74,12 +74,16 @@ func loadCatalog() (*i18n.Catalog, error) {
 }
 
 func (m *messages) english(key string, params map[string]any) string {
+	return m.in(i18n.English, key, params)
+}
+
+func (m *messages) in(lang i18n.Language, key string, params map[string]any) string {
 	catalog, err := m.load()
 	if err != nil {
 		slog.Warn("jev: load messages", "key", key, "err", err)
 		return key
 	}
-	text, err := catalog.Message(i18n.English, key, params)
+	text, err := catalog.Message(lang, key, params)
 	if err != nil {
 		slog.Warn("jev: render message", "key", key, "err", err)
 		return key

@@ -62,7 +62,7 @@ func TestCompactOnShortDoneStopsTheStack(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Compact: %v", err)
 	}
-	if !result.Done || result.Note != "Jev pruned 1 tool call, the history is 9% smaller, short of the 25% aimed for, so the stack stops here" {
+	if !result.Done || result.Note != "Jev reviewed 5 tool calls: 3 kept, 1 truncated, 1 removed, the history is 9% smaller, short of the 25% aimed for, so the stack stops here" {
 		t.Fatalf("result = %+v, want the stack to stop", result)
 	}
 }

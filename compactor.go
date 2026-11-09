@@ -120,7 +120,13 @@ func (c *compactor) result(run *compactRun, report planReport, outcome contracts
 	}
 	run.reduce(report, outcome.CharsBefore, outcome.CharsAfter)
 	reduction := reductionOf(outcome, unchangedRunes)
-	params := map[string]any{"Count": outcome.Edited, "Percent": wholePercent(reduction)}
+	params := map[string]any{
+		"Count":     run.stats.Calls,
+		"Kept":      run.kept(),
+		"Truncated": run.stats.Truncated,
+		"Pruned":    run.stats.Pruned,
+		"Percent":   wholePercent(reduction),
+	}
 	key, done := notePruned, true
 	if reduction < c.opts.minReduction {
 		key, done = notePrunedShort, false

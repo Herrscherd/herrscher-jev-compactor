@@ -147,7 +147,7 @@ func TestCompactPrunesWhatJevLetsGoAndStopsTheStack(t *testing.T) {
 	if !result.Done || result.TokensMeasured || result.Notice.Code != contracts.CodeCompacted {
 		t.Fatalf("result = %+v, want done, unmeasured, compacted", result)
 	}
-	if result.Note != "Jev pruned 2 tool calls, the history is 38% smaller" {
+	if result.Note != "Jev reviewed 5 tool calls: 3 kept, 1 truncated, 1 removed, the history is 38% smaller" {
 		t.Fatalf("note = %q", result.Note)
 	}
 	wantAsked := []string{"call_t1", "call_t2", "call_t3", "call_t4", "result_t1", "result_t2", "result_t3", "result_t4"}
@@ -172,7 +172,7 @@ func TestCompactLetsTheNextStageRunWhenTheReductionFallsShort(t *testing.T) {
 	if result.Done {
 		t.Fatalf("result = %+v, want the stack to go on", result)
 	}
-	if result.Note != "Jev pruned 1 tool call, the history is 9% smaller, short of the 25% aimed for, so the next stage runs" {
+	if result.Note != "Jev reviewed 5 tool calls: 3 kept, 1 truncated, 1 removed, the history is 9% smaller, short of the 25% aimed for, so the next stage runs" {
 		t.Fatalf("note = %q", result.Note)
 	}
 }

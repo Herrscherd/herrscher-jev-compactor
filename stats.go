@@ -17,10 +17,14 @@ func newCompactRun() *compactRun {
 
 func (r *compactRun) finish(result contracts.CompactResult, outcome contracts.CompactOutcome) contracts.CompactResult {
 	r.stats.Outcome = outcome
-	r.stats.Kept = r.stats.Calls - r.stats.Truncated - r.stats.Pruned
+	r.stats.Kept = r.kept()
 	r.stats.Duration = time.Since(r.started)
 	result.Stats = &r.stats
 	return result
+}
+
+func (r *compactRun) kept() int {
+	return r.stats.Calls - r.stats.Truncated - r.stats.Pruned
 }
 
 func (r *compactRun) examine(report planReport) {
