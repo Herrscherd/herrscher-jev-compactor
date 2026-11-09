@@ -83,6 +83,10 @@ func newCompactor(cfg contracts.PluginConfig, texts *messages, httpClient *http.
 	}, nil
 }
 
+func (c *compactor) TriggerPercent() int {
+	return c.opts.triggerPercent
+}
+
 func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _ func(contracts.BackendEvent)) (contracts.CompactResult, error) {
 	run := newCompactRun()
 	if req.History == nil {

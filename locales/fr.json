@@ -60,6 +60,11 @@
     "other": "nombre de requêtes Jev envoyées en même temps, au moins 1"
   },
   {
+    "id": "jev.setting.trigger_percent",
+    "description": "Help of the trigger_percent setting",
+    "other": "part de la fenêtre de contexte, en pour cent, à partir de laquelle Jev passe avant le seuil de l'hôte, 0 pour le seuil de l'hôte"
+  },
+  {
     "id": "jev.setting.on_short",
     "description": "Help of the on_short setting",
     "other": "keep laisse une réduction insuffisante à l'étape suivante, done arrête la pile à cet endroit, revert laisse l'historique tel quel quand la réduction est insuffisante"

@@ -60,6 +60,11 @@
     "other": "number of Jev requests sent at once, at least 1"
   },
   {
+    "id": "jev.setting.trigger_percent",
+    "description": "Help of the trigger_percent setting",
+    "other": "share of the context window, in percent, from which Jev runs before the host's threshold, 0 for the host's threshold"
+  },
+  {
     "id": "jev.setting.on_short",
     "description": "Help of the on_short setting",
     "other": "keep leaves a short reduction to the next stage, done stops the stack there, revert leaves the history as it was when the reduction is short"

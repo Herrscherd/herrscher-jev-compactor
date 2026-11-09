@@ -28,6 +28,7 @@ const (
 	settingMaxRequestTokens     = "max_request_tokens"
 	settingTimeout              = "timeout"
 	settingMaxParallel          = "max_parallel"
+	settingTriggerPercent       = "trigger_percent"
 	settingOnShort              = "on_short"
 	settingReductionUnit        = "reduction_unit"
 	settingDryRun               = "dry_run"
@@ -214,6 +215,7 @@ type options struct {
 	maxRequestTokens     int
 	timeout              time.Duration
 	maxParallel          int
+	triggerPercent       int
 	onShort              onShort
 	reductionUnit        reductionUnit
 	dryRun               bool
@@ -334,6 +336,7 @@ func settings(texts *messages) []contracts.Setting {
 		{Key: settingMaxRequestTokens, Env: "JEV_MAX_REQUEST_TOKENS", Help: texts.english(helpRequestBudget, nil), Default: strconv.Itoa(defaultMaxRequestTokens)},
 		{Key: settingTimeout, Env: "JEV_TIMEOUT", Help: texts.english(helpTimeout, nil), Default: defaultTimeout.String()},
 		{Key: settingMaxParallel, Env: "JEV_MAX_PARALLEL", Help: texts.english(helpMaxParallel, nil), Default: strconv.Itoa(defaultMaxParallel)},
+		{Key: settingTriggerPercent, Env: "JEV_TRIGGER_PERCENT", Help: texts.english(helpTriggerPercent, nil), Default: "0"},
 		{Key: settingOnShort, Env: "JEV_ON_SHORT", Help: texts.english(helpOnShort, nil), Default: keepName},
 		{Key: settingReductionUnit, Env: "JEV_REDUCTION_UNIT", Help: texts.english(helpReductionUnit, nil), Default: unitNameCharacters},
 		{Key: settingDryRun, Env: "JEV_DRY_RUN", Help: texts.english(helpDryRun, nil), Default: "false"},
@@ -399,6 +402,7 @@ func readOptions(cfg contracts.PluginConfig) (options, error) {
 		maxRequestTokens:     read.count(settingMaxRequestTokens, defaultMaxRequestTokens, 1),
 		timeout:              read.duration(settingTimeout, defaultTimeout),
 		maxParallel:          read.count(settingMaxParallel, 0, 1),
+		triggerPercent:       read.triggerPercent(),
 		onShort:              read.onShort(),
 		reductionUnit:        read.reductionUnit(),
 		dryRun:               read.flag(settingDryRun),
@@ -548,6 +552,19 @@ func (r *settingReader) count(key string, fallback, least int) int {
 	parsed, err := strconv.Atoi(value)
 	if err != nil || parsed < least {
 		r.refuse(key, value)
+		return 0
+	}
+	return parsed
+}
+
+func (r *settingReader) triggerPercent() int {
+	value, ok := r.raw(settingTriggerPercent)
+	if !ok {
+		return 0
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || contracts.ValidateStageTriggerPercent(parsed) != nil {
+		r.refuse(settingTriggerPercent, value)
 		return 0
 	}
 	return parsed

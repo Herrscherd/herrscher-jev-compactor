@@ -169,7 +169,9 @@ A batch that would go past the cap is not sent: its calls are kept, never pruned
 by default, and the note says the cap was reached with the requests and tokens
 actually sent. The decisions already taken still apply, and the stage is
 `skipped` when nothing was pruned. `0` (the default) means no cap. The Stats
-report the requests and tokens sent, whatever the cap.
+report the requests and tokens sent, whatever the cap, along with the
+estimated size of the state Jev read (`StateTokens`) and the reduction that made
+it fit (`StateReduction`, such as `texts abridged` or `inputs<=200`).
 
 `decision_log` names a JSONL file where every decision on a tool call is appended,
 one line per decision with the fields of the debug journal (`ref`, `tool`,
@@ -292,6 +294,7 @@ Exit codes:
 | `replay_dir` | `JEV_REPLAY_DIR` | empty | directory where each compaction writes one JSON snapshot for `Replay` and `cmd/jev-bench`, created with mode 0700 when missing and its files with mode 0600; an existing directory that gives group or others any access is refused with a warning, as is a snapshot over 64 MiB; a snapshot holds the full history in clear, tool outputs included; a snapshot that cannot be written is logged and the compaction goes on; empty for none |
 | `incremental` | `JEV_INCREMENTAL` | `false` | `true` does not ask Jev again about the calls it already said to keep in an earlier compaction of the same session, while their content and the goal stay the same; the cache holds 4096 calls and is emptied when a new call arrives while it is full |
 | `max_parallel` | `JEV_MAX_PARALLEL` | `4` | requests sent to Jev at once, at least 1 |
+| `trigger_percent` | `JEV_TRIGGER_PERCENT` | `0` | share of the context window, in percent, from which the host runs Jev before its own threshold, so the cheap prune passes before the backend's summary; `0` runs Jev at the host's threshold, a value above that threshold changes nothing, and a host with automatic compaction off runs Jev only on a manual compaction; a value outside 0 to 100 is refused |
 | `on_short` | `JEV_ON_SHORT` | `keep` | `keep` leaves a short reduction to the next stage, `done` stops the stack there, `revert` leaves the history as it was when the reduction is short |
 | `dry_run` | `JEV_DRY_RUN` | `false` | `true` computes what Jev would prune and changes nothing |
 | `state_input_runes` | `JEV_STATE_INPUT_RUNES` | `1000,200,60` | three cut levels of tool inputs in the state, longest first: full, short, line |

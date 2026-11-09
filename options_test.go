@@ -53,6 +53,7 @@ func TestParseOptionsRefusesBadValues(t *testing.T) {
 		settingMaxStateTokens:   "0",
 		settingMaxRequestTokens: "lots",
 		settingTimeout:          "0s",
+		settingTriggerPercent:   "101",
 	}
 	for key, value := range cases {
 		_, err := parseOptions(contracts.PluginConfig{Settings: map[string]string{settingAPIKey: "key", key: value}})
@@ -106,5 +107,29 @@ func TestParseOptionsNamesBothTokenSettingsWhenStateIsAboveRequest(t *testing.T)
 		if err == nil || !strings.Contains(err.Error(), name) {
 			t.Fatalf("parseOptions error = %v, want it to name %s", err, name)
 		}
+	}
+}
+
+func TestTriggerPercentReachesTheHostThroughStageTrigger(t *testing.T) {
+	var stage contracts.Compactor = newTestCompactor(t, &fakeJev{}, map[string]string{settingTriggerPercent: "70"})
+	trigger, ok := stage.(contracts.StageTrigger)
+	if !ok {
+		t.Fatal("the Jev stage does not implement contracts.StageTrigger")
+	}
+	if got := trigger.TriggerPercent(); got != 70 {
+		t.Fatalf("TriggerPercent = %d, want 70 from trigger_percent", got)
+	}
+}
+
+func TestTriggerPercentDefaultsToTheHostThreshold(t *testing.T) {
+	if got := newTestCompactor(t, &fakeJev{}, nil).TriggerPercent(); got != 0 {
+		t.Fatalf("TriggerPercent = %d, want 0 without trigger_percent", got)
+	}
+}
+
+func TestTriggerPercentRefusesANegativeValue(t *testing.T) {
+	_, err := parseOptions(contracts.PluginConfig{Settings: map[string]string{settingAPIKey: "key", settingTriggerPercent: "-1"}})
+	if !errors.Is(err, ErrInvalidSetting) {
+		t.Fatalf("parseOptions(trigger_percent=-1) error = %v, want ErrInvalidSetting", err)
 	}
 }

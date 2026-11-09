@@ -140,6 +140,8 @@ func TestCompactStatsReportTheOutcomeOfEachPath(t *testing.T) {
 			got.Duration = 0
 			got.RequestTokens = 0
 			got.TokensRemoved = 0
+			got.StateTokens = 0
+			got.StateReduction = ""
 			if got != tc.want {
 				t.Fatalf("stats = %+v, want %+v", got, tc.want)
 			}
@@ -168,5 +170,17 @@ func TestCompactStatsMeasureTheRequestAndTheTokensRemoved(t *testing.T) {
 	}
 	if got := result.Stats.RequestTokens; got != estimateTokens(sent) {
 		t.Fatalf("RequestTokens = %d, want %d: the tokens of the body sent", got, estimateTokens(sent))
+	}
+}
+
+func TestCompactStatsReportTheStateJevRead(t *testing.T) {
+	stage := newTestCompactor(t, &fakeJev{answers: sessionAnswers()}, nil)
+	editor := &fakeHistory{history: sessionHistory(), outcome: contracts.PruneOutcome{Edited: 2, CharsBefore: 1000, CharsAfter: 600}}
+	result, err := stage.Compact(t.Context(), contracts.CompactRequest{History: editor}, nil)
+	if err != nil {
+		t.Fatalf("Compact: %v", err)
+	}
+	if result.Stats.StateTokens <= 0 || result.Stats.StateReduction != "inputs<=1000" {
+		t.Fatalf("state = %d tokens, %q, want a measured state fitted at the full input level", result.Stats.StateTokens, result.Stats.StateReduction)
 	}
 }
