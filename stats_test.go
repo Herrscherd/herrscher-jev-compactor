@@ -184,3 +184,15 @@ func TestCompactStatsReportTheStateJevRead(t *testing.T) {
 		t.Fatalf("state = %d tokens, %q, want a measured state fitted at the full input level", result.Stats.StateTokens, result.Stats.StateReduction)
 	}
 }
+
+func TestCompactStatsReportNoStateWhenTheCapStopsTheFirstRequest(t *testing.T) {
+	stage := newTestCompactor(t, &fakeJev{answers: sessionAnswers()}, map[string]string{settingMaxSent: "1"})
+	editor := &fakeHistory{history: sessionHistory()}
+	result, err := stage.Compact(t.Context(), contracts.CompactRequest{History: editor}, nil)
+	if err != nil {
+		t.Fatalf("Compact: %v", err)
+	}
+	if result.Stats.Requests != 0 || result.Stats.StateTokens != 0 || result.Stats.StateReduction != "" {
+		t.Fatalf("requests = %d, state = %d tokens, %q, want no request and no state", result.Stats.Requests, result.Stats.StateTokens, result.Stats.StateReduction)
+	}
+}
