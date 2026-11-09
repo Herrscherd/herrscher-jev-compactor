@@ -292,7 +292,9 @@ func (c *compactor) decide(ctx context.Context, history contracts.History, sessi
 		set, err := answer(ctx, calls, split.asked)
 		report.sent = set.sent
 		report.capped = set.capped
-		report.state = set.state
+		if set.sent.requests > 0 {
+			report.state = set.state
+		}
 		report.judgments = judgmentsOf(split.asked, set.answers)
 		report.unanswered = len(split.asked) - len(report.judgments)
 		if err != nil {

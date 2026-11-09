@@ -195,4 +195,7 @@ func TestCompactStatsReportNoStateWhenTheCapStopsTheFirstRequest(t *testing.T) {
 	if result.Stats.Requests != 0 || result.Stats.StateTokens != 0 || result.Stats.StateReduction != "" {
 		t.Fatalf("requests = %d, state = %d tokens, %q, want no request and no state", result.Stats.Requests, result.Stats.StateTokens, result.Stats.StateReduction)
 	}
+	if strings.Contains(result.Note, "State read by Jev") {
+		t.Fatalf("note = %q, want no state Jev never read", result.Note)
+	}
 }
