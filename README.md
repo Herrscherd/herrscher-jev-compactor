@@ -157,6 +157,9 @@ history cannot be read or pruned, or when its context is cancelled.
 | `goal_text` | `JEV_GOAL_TEXT` | none | the fixed goal, required when `goal_source` is `fixed` |
 | `goal_prompts` | `JEV_GOAL_PROMPTS` | `3` | number of the last user prompts that make the goal, at least 1 |
 | `goal_prompt_runes` | `JEV_GOAL_PROMPT_RUNES` | `500` | characters kept of each user prompt in the goal, at least 1 |
+| `preserve_first` | `JEV_PRESERVE_FIRST` | `true` | `true` keeps the first message of the history, the initial request, never pruned or abridged |
+| `preserve_recent_tokens` | `JEV_PRESERVE_RECENT_TOKENS` | `0` | token budget of the newest messages whose tool calls are never pruned, `0` for none |
+| `preserve_turns` | `JEV_PRESERVE_TURNS` | `0` | everything after the Nth last user message is never pruned, `0` for none |
 
 Tokens are estimated without a tokenizer, with the weights fast-jev calibrated
 against what Jev reports: a word costs one token per six letters, a digit half

@@ -49,7 +49,7 @@ type stateFitter struct {
 	byMessage      map[int][]toolCall
 	goal           string
 	context        string
-	preserveRecent int
+	pinnedMessages []bool
 	maxTokens      int
 	ladder         inputLadder
 	stages         []stageKind
@@ -68,7 +68,7 @@ func fitState(history contracts.History, calls []toolCall, goal string, opts opt
 		byMessage:      callsByMessage(calls),
 		goal:           goal,
 		context:        opts.stateContextText(),
-		preserveRecent: opts.preserveRecent,
+		pinnedMessages: opts.preservation().pinnedMessages(history.Messages),
 		maxTokens:      opts.maxStateTokens,
 		ladder:         opts.stateLadder(),
 		stages:         opts.stateStageKinds(),
@@ -115,7 +115,7 @@ func (f *stateFitter) fitted(stage string) fittedState {
 }
 
 func (f *stateFitter) pinned(entry *historyEntry) bool {
-	return isPinned(entry.Index, len(f.messages), f.preserveRecent)
+	return f.pinnedMessages[entry.Index]
 }
 
 func (f *stateFitter) fit() (fittedState, error) {

@@ -150,6 +150,21 @@
     "other": "characters kept of each user prompt in the goal, at least 1"
   },
   {
+    "id": "jev.setting.preserve_first",
+    "description": "Help of the preserve_first setting: whether the first message of the history is never pruned or abridged",
+    "other": "true keeps the first message of the history, the initial request, never pruned or abridged"
+  },
+  {
+    "id": "jev.setting.preserve_recent_tokens",
+    "description": "Help of the preserve_recent_tokens setting: token budget of the newest messages that are never pruned, 0 for none",
+    "other": "token budget of the newest messages whose tool calls are never pruned, 0 for none"
+  },
+  {
+    "id": "jev.setting.preserve_turns",
+    "description": "Help of the preserve_turns setting: number of the last user messages after which everything is never pruned, 0 for none",
+    "other": "everything after the Nth last user message is never pruned, 0 for none"
+  },
+  {
     "id": "jev.note.failed",
     "description": "The Jev stage failed for Reason, pruned nothing and lets the next stage of the stack compact",
     "other": "Jev pruned nothing, the next stage compacts: {{.Reason}}"

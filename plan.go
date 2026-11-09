@@ -138,7 +138,7 @@ func (o options) thresholdsFor(picked rule) thresholds {
 }
 
 func (c *compactor) plan(ctx context.Context, history contracts.History, instruction string) ([]contracts.HistoryEdit, error) {
-	calls := collectCalls(history, c.opts.preserveRecent)
+	calls := collectCallsWith(history, c.opts.preservation())
 	decided, asked := c.decideLocally(calls)
 	if len(asked) > 0 {
 		answers, err := c.judge(ctx, history, calls, asked, instruction)

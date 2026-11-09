@@ -43,6 +43,9 @@ const (
 	settingGoalText            = "goal_text"
 	settingGoalPrompts         = "goal_prompts"
 	settingGoalPromptRunes     = "goal_prompt_runes"
+	settingPreserveFirst       = "preserve_first"
+	settingPreserveRecentToken = "preserve_recent_tokens"
+	settingPreserveTurns       = "preserve_turns"
 )
 
 const (
@@ -68,6 +71,7 @@ const (
 	defaultTextTailRunes    = 150
 	defaultGoalPrompts      = 3
 	defaultGoalPromptRunes  = 500
+	defaultPreserveFirst    = true
 )
 
 type onShort uint8
@@ -145,36 +149,60 @@ func (r optionalRatio) or(fallback float64) float64 {
 	return fallback
 }
 
+type optionalFlag struct {
+	value bool
+	set   bool
+}
+
+func (f optionalFlag) or(fallback bool) bool {
+	if f.set {
+		return f.value
+	}
+	return fallback
+}
+
 type options struct {
-	apiKey           string
-	model            string
-	endpoint         string
-	keepThreshold    float64
-	keepCall         optionalRatio
-	keepResult       optionalRatio
-	preserveRecent   int
-	truncateHead     int
-	minReduction     float64
-	maxStateTokens   int
-	maxRequestTokens int
-	timeout          time.Duration
-	maxParallel      int
-	onShort          onShort
-	dryRun           bool
-	policy           *callPolicy
-	keepErrors       bool
-	minResultChars   int
-	maxPruned        int
-	maxRemovedShare  float64
-	stateInputRunes  inputLadder
-	stateTextHead    int
-	stateTextTail    int
-	stateContext     string
-	stateStages      stageOrder
-	goalSource       goalSource
-	goalText         string
-	goalPrompts      int
-	goalPromptRunes  int
+	apiKey               string
+	model                string
+	endpoint             string
+	keepThreshold        float64
+	keepCall             optionalRatio
+	keepResult           optionalRatio
+	preserveRecent       int
+	truncateHead         int
+	minReduction         float64
+	maxStateTokens       int
+	maxRequestTokens     int
+	timeout              time.Duration
+	maxParallel          int
+	onShort              onShort
+	dryRun               bool
+	policy               *callPolicy
+	keepErrors           bool
+	minResultChars       int
+	maxPruned            int
+	maxRemovedShare      float64
+	stateInputRunes      inputLadder
+	stateTextHead        int
+	stateTextTail        int
+	stateContext         string
+	stateStages          stageOrder
+	goalSource           goalSource
+	goalText             string
+	goalPrompts          int
+	goalPromptRunes      int
+	preserveFirst        optionalFlag
+	preserveRecentTokens int
+	preserveTurns        int
+}
+
+func (o options) preservation() preservation {
+	return preservation{
+		first:        o.preserveFirst.or(defaultPreserveFirst),
+		recent:       o.preserveRecent,
+		recentTokens: o.preserveRecentTokens,
+		turns:        o.preserveTurns,
+	}
 }
 
 func (o options) parallelism() int {
@@ -266,6 +294,9 @@ func settings(texts *messages) []contracts.Setting {
 		{Key: settingGoalText, Env: "JEV_GOAL_TEXT", Help: texts.english(helpGoalText, nil)},
 		{Key: settingGoalPrompts, Env: "JEV_GOAL_PROMPTS", Help: texts.english(helpGoalPrompts, nil), Default: strconv.Itoa(defaultGoalPrompts)},
 		{Key: settingGoalPromptRunes, Env: "JEV_GOAL_PROMPT_RUNES", Help: texts.english(helpGoalPromptRunes, nil), Default: strconv.Itoa(defaultGoalPromptRunes)},
+		{Key: settingPreserveFirst, Env: "JEV_PRESERVE_FIRST", Help: texts.english(helpPreserveFirst, nil), Default: strconv.FormatBool(defaultPreserveFirst)},
+		{Key: settingPreserveRecentToken, Env: "JEV_PRESERVE_RECENT_TOKENS", Help: texts.english(helpPreserveRecentTokens, nil), Default: "0"},
+		{Key: settingPreserveTurns, Env: "JEV_PRESERVE_TURNS", Help: texts.english(helpPreserveTurns, nil), Default: "0"},
 	}
 }
 
@@ -276,35 +307,38 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 	}
 	read := settingReader{cfg: cfg}
 	opts := options{
-		apiKey:           apiKey,
-		model:            read.text(settingModel, defaultModel),
-		endpoint:         read.endpoint(),
-		keepThreshold:    read.ratio(settingKeepThreshold, defaultKeepThreshold),
-		keepCall:         read.optionalRatio(settingKeepCallThreshold),
-		keepResult:       read.optionalRatio(settingKeepResultThreshold),
-		preserveRecent:   read.count(settingPreserveRecent, defaultPreserveRecent, 0),
-		truncateHead:     read.count(settingTruncateHead, defaultTruncateHead, 0),
-		minReduction:     read.ratio(settingMinReduction, defaultMinReduction),
-		maxStateTokens:   read.count(settingMaxStateTokens, defaultMaxStateTokens, 1),
-		maxRequestTokens: read.count(settingMaxRequestTokens, defaultMaxRequestTokens, 1),
-		timeout:          read.duration(settingTimeout, defaultTimeout),
-		maxParallel:      read.count(settingMaxParallel, 0, 1),
-		onShort:          read.onShort(),
-		dryRun:           read.flag(settingDryRun),
-		policy:           read.policy(),
-		keepErrors:       read.flag(settingKeepErrors),
-		minResultChars:   read.count(settingMinResultChars, defaultMinResultChars, 0),
-		maxPruned:        read.count(settingMaxPruned, defaultMaxPruned, 0),
-		maxRemovedShare:  read.share(settingMaxRemovedShare),
-		stateInputRunes:  read.inputLadder(),
-		stateTextHead:    read.count(settingStateTextHead, 0, 1),
-		stateTextTail:    read.count(settingStateTextTail, 0, 1),
-		stateContext:     read.text(settingStateContext, ""),
-		stateStages:      read.stageOrder(),
-		goalSource:       read.goalSource(),
-		goalText:         strings.TrimSpace(read.text(settingGoalText, "")),
-		goalPrompts:      read.count(settingGoalPrompts, 0, 1),
-		goalPromptRunes:  read.count(settingGoalPromptRunes, 0, 1),
+		apiKey:               apiKey,
+		model:                read.text(settingModel, defaultModel),
+		endpoint:             read.endpoint(),
+		keepThreshold:        read.ratio(settingKeepThreshold, defaultKeepThreshold),
+		keepCall:             read.optionalRatio(settingKeepCallThreshold),
+		keepResult:           read.optionalRatio(settingKeepResultThreshold),
+		preserveRecent:       read.count(settingPreserveRecent, defaultPreserveRecent, 0),
+		truncateHead:         read.count(settingTruncateHead, defaultTruncateHead, 0),
+		minReduction:         read.ratio(settingMinReduction, defaultMinReduction),
+		maxStateTokens:       read.count(settingMaxStateTokens, defaultMaxStateTokens, 1),
+		maxRequestTokens:     read.count(settingMaxRequestTokens, defaultMaxRequestTokens, 1),
+		timeout:              read.duration(settingTimeout, defaultTimeout),
+		maxParallel:          read.count(settingMaxParallel, 0, 1),
+		onShort:              read.onShort(),
+		dryRun:               read.flag(settingDryRun),
+		policy:               read.policy(),
+		keepErrors:           read.flag(settingKeepErrors),
+		minResultChars:       read.count(settingMinResultChars, defaultMinResultChars, 0),
+		maxPruned:            read.count(settingMaxPruned, defaultMaxPruned, 0),
+		maxRemovedShare:      read.share(settingMaxRemovedShare),
+		stateInputRunes:      read.inputLadder(),
+		stateTextHead:        read.count(settingStateTextHead, 0, 1),
+		stateTextTail:        read.count(settingStateTextTail, 0, 1),
+		stateContext:         read.text(settingStateContext, ""),
+		stateStages:          read.stageOrder(),
+		goalSource:           read.goalSource(),
+		goalText:             strings.TrimSpace(read.text(settingGoalText, "")),
+		goalPrompts:          read.count(settingGoalPrompts, 0, 1),
+		goalPromptRunes:      read.count(settingGoalPromptRunes, 0, 1),
+		preserveFirst:        read.optionalFlag(settingPreserveFirst),
+		preserveRecentTokens: read.count(settingPreserveRecentToken, 0, 0),
+		preserveTurns:        read.count(settingPreserveTurns, 0, 0),
 	}
 	if opts.goalSource == goalSourceFixed && opts.goalText == "" {
 		read.refuse(settingGoalText, "")
@@ -479,6 +513,13 @@ func (r *settingReader) policy() *callPolicy {
 		policy.pins = pins
 	}
 	return policy
+}
+
+func (r *settingReader) optionalFlag(key string) optionalFlag {
+	if _, ok := r.raw(key); !ok {
+		return optionalFlag{}
+	}
+	return optionalFlag{value: r.flag(key), set: true}
 }
 
 func (r *settingReader) flag(key string) bool {

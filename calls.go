@@ -31,13 +31,13 @@ func (c toolCall) status() string {
 	return "ok"
 }
 
-func isPinned(index, total, preserveRecent int) bool {
-	return index == 0 || index >= total-preserveRecent
+func collectCalls(history contracts.History, preserveRecent int) []toolCall {
+	return collectCallsWith(history, preservation{first: true, recent: preserveRecent})
 }
 
-func collectCalls(history contracts.History, preserveRecent int) []toolCall {
+func collectCallsWith(history contracts.History, keep preservation) []toolCall {
 	var calls []toolCall
-	total := len(history.Messages)
+	pinned := keep.pinnedMessages(history.Messages)
 	for index := range history.Messages {
 		for _, call := range history.Messages[index].Calls {
 			if call.Result == "" {
@@ -47,7 +47,7 @@ func collectCalls(history contracts.History, preserveRecent int) []toolCall {
 				ref:     "t" + strconv.Itoa(len(calls)+1),
 				source:  call,
 				message: index,
-				pinned:  isPinned(index, total, preserveRecent),
+				pinned:  pinned[index],
 			})
 		}
 	}

@@ -150,6 +150,21 @@
     "other": "caractères gardés de chaque message utilisateur dans le but, au moins 1"
   },
   {
+    "id": "jev.setting.preserve_first",
+    "description": "Help of the preserve_first setting: whether the first message of the history is never pruned or abridged",
+    "other": "true garde le premier message de l'historique, la demande initiale, sans l'élaguer ni l'abréger"
+  },
+  {
+    "id": "jev.setting.preserve_recent_tokens",
+    "description": "Help of the preserve_recent_tokens setting: token budget of the newest messages that are never pruned, 0 for none",
+    "other": "budget en tokens des messages les plus récents dont les appels d'outil ne sont jamais élagués, 0 pour aucun"
+  },
+  {
+    "id": "jev.setting.preserve_turns",
+    "description": "Help of the preserve_turns setting: number of the last user messages after which everything is never pruned, 0 for none",
+    "other": "tout ce qui suit le N-ième dernier message utilisateur n'est jamais élagué, 0 pour aucun"
+  },
+  {
     "id": "jev.note.failed",
     "description": "The Jev stage failed for Reason, pruned nothing and lets the next stage of the stack compact",
     "other": "Jev n'a rien élagué, l'étape suivante compacte : {{.Reason}}"
