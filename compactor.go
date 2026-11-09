@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	contracts "github.com/Herrscherd/herrscher-contracts"
 )
@@ -57,9 +58,18 @@ func newCompactor(cfg contracts.PluginConfig, texts *messages, httpClient *http.
 		return nil, err
 	}
 	return &compactor{
-		opts:   opts,
-		client: &jevClient{http: refusingClient(httpClient, opts.timeout), endpoint: opts.endpoint, apiKey: opts.apiKey, model: opts.model},
-		texts:  texts,
+		opts: opts,
+		client: &jevClient{
+			http:     refusingClient(httpClient, opts.timeout),
+			endpoint: opts.endpoint,
+			apiKey:   opts.apiKey,
+			model:    opts.model,
+			retries:  opts.retries,
+			backoff:  opts.retryBackoff,
+			now:      time.Now,
+			sleep:    sleepContext,
+		},
+		texts: texts,
 	}, nil
 }
 

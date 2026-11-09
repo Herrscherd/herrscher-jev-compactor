@@ -48,6 +48,8 @@ const (
 	settingPreserveFirst        = "preserve_first"
 	settingPreserveRecentBudget = "preserve_recent_tokens"
 	settingPreserveTurns        = "preserve_turns"
+	settingRetries              = "retries"
+	settingRetryBackoff         = "retry_backoff"
 )
 
 const (
@@ -75,6 +77,8 @@ const (
 	defaultGoalPrompts      = 3
 	defaultGoalPromptRunes  = 500
 	defaultPreserveFirst    = true
+	defaultRetries          = 0
+	defaultRetryBackoff     = time.Second
 )
 
 type onShort uint8
@@ -202,6 +206,8 @@ type options struct {
 	preserveFirst        optionalFlag
 	preserveRecentTokens int
 	preserveTurns        int
+	retries              int
+	retryBackoff         time.Duration
 }
 
 func (o options) preservation() preservation {
@@ -315,6 +321,8 @@ func settings(texts *messages) []contracts.Setting {
 		{Key: settingPreserveFirst, Env: "JEV_PRESERVE_FIRST", Help: texts.english(helpPreserveFirst, nil), Default: strconv.FormatBool(defaultPreserveFirst)},
 		{Key: settingPreserveRecentBudget, Env: "JEV_PRESERVE_RECENT_TOKENS", Help: texts.english(helpPreserveRecentBudget, nil), Default: "0"},
 		{Key: settingPreserveTurns, Env: "JEV_PRESERVE_TURNS", Help: texts.english(helpPreserveTurns, nil), Default: "0"},
+		{Key: settingRetries, Env: "JEV_RETRIES", Help: texts.english(helpRetries, nil), Default: strconv.Itoa(defaultRetries)},
+		{Key: settingRetryBackoff, Env: "JEV_RETRY_BACKOFF", Help: texts.english(helpRetryBackoff, nil), Default: defaultRetryBackoff.String()},
 	}
 }
 
@@ -359,9 +367,14 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 		preserveFirst:        read.optionalFlag(settingPreserveFirst),
 		preserveRecentTokens: read.count(settingPreserveRecentBudget, 0, 0),
 		preserveTurns:        read.count(settingPreserveTurns, 0, 0),
+		retries:              read.count(settingRetries, defaultRetries, 0),
+		retryBackoff:         read.duration(settingRetryBackoff, defaultRetryBackoff),
 	}
 	if opts.goalSource == goalSourceFixed && opts.goalText == "" {
 		read.refuse(settingGoalText, "")
+	}
+	if opts.retries > maxRetries {
+		read.refuse(settingRetries, strconv.Itoa(opts.retries))
 	}
 	if read.err != nil {
 		return options{}, read.err

@@ -145,6 +145,13 @@ summary. The reason never carries the API key: an error body that echoes it is
 redacted. The compaction fails only where going on would be wrong: when the
 history cannot be read or pruned, or when its context is cancelled.
 
+A `429` or a `5xx` answer is sent again up to `retries` times, after a wait of
+`retry_backoff` doubled at each retry, or of the `Retry-After` the answer gives
+when that is longer (in seconds or as an HTTP date). Waits are capped at 30s:
+a `Retry-After` over 30s is not waited for, the failure stands and the stage
+steps aside as above. Other `4xx` answers, network errors and timeouts are
+never retried, and a wait ends with the context of the compaction.
+
 ## Settings
 
 | Key | Env | Default | Meaning |
@@ -169,6 +176,8 @@ history cannot be read or pruned, or when its context is cancelled.
 | `max_state_tokens` | `JEV_MAX_STATE_TOKENS` | `25000` | token budget of the state |
 | `max_request_tokens` | `JEV_MAX_REQUEST_TOKENS` | `30000` | token budget of one request |
 | `timeout` | `JEV_TIMEOUT` | `2m0s` | timeout of one request, as a Go duration |
+| `retries` | `JEV_RETRIES` | `0` | times a request is sent again after a 429 or a 5xx answer, at most 10, `0` for none |
+| `retry_backoff` | `JEV_RETRY_BACKOFF` | `1s` | first wait before a retry, as a Go duration, doubled at each retry and capped at 30s |
 | `max_parallel` | `JEV_MAX_PARALLEL` | `4` | requests sent to Jev at once, at least 1 |
 | `on_short` | `JEV_ON_SHORT` | `keep` | `keep` leaves a short reduction to the next stage, `done` stops the stack there, `revert` leaves the history as it was when the reduction is short |
 | `dry_run` | `JEV_DRY_RUN` | `false` | `true` computes what Jev would prune and changes nothing |

@@ -18,7 +18,7 @@ func TestParseOptionsAppliesTheDefaults(t *testing.T) {
 		keepThreshold: defaultKeepThreshold, preserveRecent: defaultPreserveRecent,
 		truncateHead: defaultTruncateHead, truncateTail: defaultTruncateTail, minReduction: defaultMinReduction,
 		maxStateTokens: defaultMaxStateTokens, maxRequestTokens: defaultMaxRequestTokens,
-		timeout: defaultTimeout,
+		timeout: defaultTimeout, retryBackoff: defaultRetryBackoff,
 	}
 	if opts != want {
 		t.Fatalf("parseOptions = %+v, want %+v", opts, want)

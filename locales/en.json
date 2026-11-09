@@ -175,6 +175,16 @@
     "other": "everything after the Nth last user message is never pruned, 0 for none"
   },
   {
+    "id": "jev.setting.retries",
+    "description": "Help of the retries setting: how many times a request to Jev is sent again on a 429 or a 5xx answer, 0 for none",
+    "other": "times a Jev request is sent again after a 429 or a 5xx answer, at most 10, 0 for none"
+  },
+  {
+    "id": "jev.setting.retry_backoff",
+    "description": "Help of the retry_backoff setting: the first wait before a retry, as a Go duration, doubled at each retry",
+    "other": "first wait before a Jev request is sent again, as a Go duration, doubled at each retry, capped at 30s"
+  },
+  {
     "id": "jev.note.failed",
     "description": "The Jev stage failed for Reason, pruned nothing and lets the next stage of the stack compact",
     "other": "Jev pruned nothing, the next stage compacts: {{.Reason}}"

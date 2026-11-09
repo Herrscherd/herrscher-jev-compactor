@@ -175,6 +175,16 @@
     "other": "tout ce qui suit le N-ième dernier message utilisateur n'est jamais élagué, 0 pour aucun"
   },
   {
+    "id": "jev.setting.retries",
+    "description": "Help of the retries setting: how many times a request to Jev is sent again on a 429 or a 5xx answer, 0 for none",
+    "other": "nombre de nouvelles tentatives d'une requête Jev après une réponse 429 ou 5xx, au plus 10, 0 pour aucune"
+  },
+  {
+    "id": "jev.setting.retry_backoff",
+    "description": "Help of the retry_backoff setting: the first wait before a retry, as a Go duration, doubled at each retry",
+    "other": "première attente avant une nouvelle tentative d'une requête Jev, en durée Go, doublée à chaque tentative, plafonnée à 30s"
+  },
+  {
     "id": "jev.note.failed",
     "description": "The Jev stage failed for Reason, pruned nothing and lets the next stage of the stack compact",
     "other": "Jev n'a rien élagué, l'étape suivante compacte : {{.Reason}}"

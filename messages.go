@@ -49,6 +49,8 @@ const (
 	helpPreserveFirst        = "jev.setting.preserve_first"
 	helpPreserveRecentBudget = "jev.setting.preserve_recent_tokens"
 	helpPreserveTurns        = "jev.setting.preserve_turns"
+	helpRetries              = "jev.setting.retries"
+	helpRetryBackoff         = "jev.setting.retry_backoff"
 	noteFailed               = "jev.note.failed"
 	noteNoHistory            = "jev.note.no_history"
 	noteNothingToPrune       = "jev.note.nothing_to_prune"
