@@ -95,15 +95,24 @@ func decideWith(call toolCall, answer callAnswer, keep thresholds) decision {
 	}
 }
 
-func editFor(call toolCall, verdict decision, truncateHead int) (contracts.HistoryEdit, bool) {
+type truncation struct {
+	head int
+	tail int
+}
+
+func (o options) truncationFor(picked rule) truncation {
+	return truncation{head: orDefault(picked.head, o.truncateHead), tail: picked.tail.or(o.truncateTail)}
+}
+
+func editFor(call toolCall, verdict decision, cut truncation) (contracts.HistoryEdit, bool) {
 	switch verdict {
 	case decisionKeep:
 		return contracts.HistoryEdit{}, false
 	case decisionPruneResult:
-		if call.resultRunes() <= truncateHead+truncateSlackRunes {
+		if call.resultRunes() <= cut.head+cut.tail+truncateSlackRunes {
 			return contracts.HistoryEdit{}, false
 		}
-		return contracts.HistoryEdit{CallID: call.source.ID, Action: contracts.PruneResult, KeepChars: truncateHead}, true
+		return contracts.HistoryEdit{CallID: call.source.ID, Action: contracts.PruneResult, KeepChars: cut.head, KeepTail: cut.tail}, true
 	case decisionPruneCall:
 		return contracts.HistoryEdit{CallID: call.source.ID, Action: contracts.PruneCall}, true
 	}
@@ -217,7 +226,7 @@ func (c *compactor) decideLocally(calls []toolCall) (map[string]plannedEdit, []t
 			asked = append(asked, call)
 			continue
 		}
-		if edit, ok := c.verdictEdit(call, picked.action.decision(), orDefault(picked.head, c.opts.truncateHead), ruleDecided); ok {
+		if edit, ok := c.verdictEdit(call, picked.action.decision(), c.opts.truncationFor(picked), ruleDecided); ok {
 			decided[call.ref] = edit
 		}
 	}
@@ -230,7 +239,7 @@ func (c *compactor) decideAsked(asked []toolCall, answers map[string]callAnswer,
 		answer := answers[call.ref]
 		verdict := decideWith(call, answer, c.opts.thresholdsFor(picked))
 		keep := max(answer.keepCall, answer.keepResult)
-		if edit, ok := c.verdictEdit(call, verdict, orDefault(picked.head, c.opts.truncateHead), keep); ok {
+		if edit, ok := c.verdictEdit(call, verdict, c.opts.truncationFor(picked), keep); ok {
 			decided[call.ref] = edit
 		}
 	}
@@ -257,11 +266,11 @@ func (c *compactor) judge(ctx context.Context, history contracts.History, calls,
 	return c.askAll(ctx, fitted.state, batches)
 }
 
-func (c *compactor) verdictEdit(call toolCall, verdict decision, head int, keep float64) (plannedEdit, bool) {
+func (c *compactor) verdictEdit(call toolCall, verdict decision, cut truncation, keep float64) (plannedEdit, bool) {
 	if c.opts.keepErrors && call.source.ResultIsError && verdict == decisionPruneCall {
 		verdict = decisionPruneResult
 	}
-	edit, prune := editFor(call, verdict, head)
+	edit, prune := editFor(call, verdict, cut)
 	if !prune {
 		return plannedEdit{}, false
 	}

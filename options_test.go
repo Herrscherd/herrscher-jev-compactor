@@ -16,7 +16,7 @@ func TestParseOptionsAppliesTheDefaults(t *testing.T) {
 	want := options{
 		apiKey: "key", model: defaultModel, endpoint: defaultEndpoint,
 		keepThreshold: defaultKeepThreshold, preserveRecent: defaultPreserveRecent,
-		truncateHead: defaultTruncateHead, minReduction: defaultMinReduction,
+		truncateHead: defaultTruncateHead, truncateTail: defaultTruncateTail, minReduction: defaultMinReduction,
 		maxStateTokens: defaultMaxStateTokens, maxRequestTokens: defaultMaxRequestTokens,
 		timeout: defaultTimeout,
 	}
@@ -47,6 +47,7 @@ func TestParseOptionsRefusesBadValues(t *testing.T) {
 		settingKeepThreshold:    "1.5",
 		settingMinReduction:     "NaN",
 		settingPreserveRecent:   "-1",
+		settingTruncateTail:     "-1",
 		settingMaxStateTokens:   "0",
 		settingMaxRequestTokens: "lots",
 		settingTimeout:          "0s",

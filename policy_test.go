@@ -79,6 +79,15 @@ func TestRulesDecideLocallyWithoutAskingJev(t *testing.T) {
 				{CallID: "toolu_gone", Action: contracts.PruneCall},
 			},
 		},
+		{
+			name:     "truncate uses the rule tail",
+			rules:    "Bash:truncate,tail=20",
+			notAsked: []string{"call_t2", "result_t2", "call_t4", "result_t4"},
+			want: []contracts.HistoryEdit{
+				{CallID: "toolu_head", Action: contracts.PruneResult, KeepChars: defaultTruncateHead, KeepTail: 20},
+				{CallID: "toolu_gone", Action: contracts.PruneCall},
+			},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -92,6 +101,42 @@ func TestRulesDecideLocallyWithoutAskingJev(t *testing.T) {
 				t.Fatalf("plan = %+v, want %+v", edits, tc.want)
 			}
 		})
+	}
+}
+
+func TestTruncateTailComesFromTheSettingUnlessARuleSetsIt(t *testing.T) {
+	cases := map[string]struct {
+		settings  map[string]string
+		keepTail  int
+		untouched bool
+	}{
+		"the setting":               {settings: map[string]string{settingTruncateTail: "40"}, keepTail: 40},
+		"a rule":                    {settings: map[string]string{settingTruncateTail: "40", settingRules: "Bash:truncate,tail=20"}, keepTail: 20},
+		"a rule of zero":            {settings: map[string]string{settingTruncateTail: "40", settingRules: "Bash:truncate,tail=0"}, keepTail: 0},
+		"the slack counts the tail": {settings: map[string]string{settingTruncateHead: "1300", settingTruncateTail: "100"}, untouched: true},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			edits, _ := planWith(t, sessionHistory(), tc.settings)
+			edit, found := editOf(edits, "toolu_head")
+			if tc.untouched {
+				if found {
+					t.Fatalf("the output within head, tail and slack was cut: %+v", edit)
+				}
+				return
+			}
+			if !found || edit.KeepChars != defaultTruncateHead || edit.KeepTail != tc.keepTail {
+				t.Fatalf("edit = %+v, %v, want the head kept and KeepTail %d", edit, found, tc.keepTail)
+			}
+		})
+	}
+}
+
+func TestRemovedTextKeepsTheHeadAndTheTail(t *testing.T) {
+	call := toolCall{source: contracts.HistoryCall{ID: "toolu_x", Result: "abcdefghij"}}
+	got := removedText(call, contracts.HistoryEdit{Action: contracts.PruneResult, KeepChars: 3, KeepTail: 2})
+	if want := "defgh"; got != want {
+		t.Fatalf("removedText = %q, want %q", got, want)
 	}
 }
 

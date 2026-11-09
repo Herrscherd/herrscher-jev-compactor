@@ -51,6 +51,19 @@ type rule struct {
 	callKeep   optionalRatio
 	resultKeep optionalRatio
 	head       int
+	tail       optionalCount
+}
+
+type optionalCount struct {
+	value int
+	set   bool
+}
+
+func (c optionalCount) or(fallback int) int {
+	if c.set {
+		return c.value
+	}
+	return fallback
 }
 
 func parseRules(text string) ([]rule, bool) {
@@ -106,6 +119,9 @@ func (r *rule) apply(token string) bool {
 	case "head":
 		runes, err := strconv.Atoi(value)
 		return err == nil && runes >= 1 && r.setHead(runes)
+	case "tail":
+		runes, err := strconv.Atoi(value)
+		return err == nil && runes >= 0 && r.setTail(runes)
 	}
 	return false
 }
@@ -139,6 +155,14 @@ func (r *rule) setHead(runes int) bool {
 		return false
 	}
 	r.head = runes
+	return true
+}
+
+func (r *rule) setTail(runes int) bool {
+	if r.tail.set {
+		return false
+	}
+	r.tail = optionalCount{value: runes, set: true}
 	return true
 }
 

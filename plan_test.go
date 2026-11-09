@@ -29,11 +29,11 @@ func TestDecideFollowsTheThreshold(t *testing.T) {
 
 func TestEditForLeavesShortResultsAlone(t *testing.T) {
 	short := toolCall{source: contracts.HistoryCall{ID: "a", Result: strings.Repeat("x", 420)}}
-	if _, prune := editFor(short, decisionPruneResult, 300); prune {
+	if _, prune := editFor(short, decisionPruneResult, truncation{head: 300}); prune {
 		t.Fatal("a result within the slack of the head was pruned")
 	}
 	long := toolCall{source: contracts.HistoryCall{ID: "b", Result: strings.Repeat("x", 421)}}
-	edit, prune := editFor(long, decisionPruneResult, 300)
+	edit, prune := editFor(long, decisionPruneResult, truncation{head: 300})
 	if !prune || edit != (contracts.HistoryEdit{CallID: "b", Action: contracts.PruneResult, KeepChars: 300}) {
 		t.Fatalf("editFor = %+v, %v", edit, prune)
 	}

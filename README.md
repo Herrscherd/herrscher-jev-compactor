@@ -72,8 +72,9 @@ setting.
 5. Decide per call, against `keep_call_threshold` and `keep_result_threshold`
    (both default to `keep_threshold`), or the thresholds of the call's rule:
    - the output is still needed: keep the call untouched;
-   - only the call is: keep its first `truncate_head` characters of output
-     (`PruneResult`), when the output is longer than that by more than 120;
+   - only the call is: keep its first `truncate_head` and its last
+     `truncate_tail` characters of output (`PruneResult`), when the output is
+     longer than those by more than 120;
    - neither: prune the call (`PruneCall`), which keeps the call in place with
      its input shortened and its output replaced by a note.
 6. Apply every edit in one `PruneHistory` call.
@@ -93,9 +94,11 @@ them. A rule is `motif[,motif]:action[,action]`, rules are separated by `;`,
 and the first rule whose motif matches the tool name wins. A motif is a
 `path.Match` glob such as `Read*`. The actions are `keep` (the call stays
 untouched), `prune` (the call is pruned, as `PruneCall`) and `truncate` (the
-output keeps `head` characters, as `PruneResult`). A rule with no action leaves
+output keeps its first `head` and last `tail` characters, as `PruneResult`). A
+rule with no action leaves
 the decision to Jev, judged against the thresholds it sets with `threshold=`,
-`call_threshold=` and `result_threshold=`, and against its `head`. For example:
+`call_threshold=` and `result_threshold=`, and against its `head` and `tail`.
+For example:
 
 ```bash
 export JEV_RULES='Edit,Write:keep;Bash:threshold=0.7,head=500;Grep:prune'
@@ -141,6 +144,7 @@ history cannot be read or pruned, or when its context is cancelled.
 | `max_removed_share` | `JEV_MAX_REMOVED_SHARE` | `1` | most of the history, 0 to 1, one compaction may remove, `1` for no limit |
 | `preserve_recent` | `JEV_PRESERVE_RECENT` | `6` | newest messages whose calls are pinned |
 | `truncate_head` | `JEV_TRUNCATE_HEAD` | `300` | characters kept from an output Jev lets go |
+| `truncate_tail` | `JEV_TRUNCATE_TAIL` | `0` | characters kept from the end of an output Jev lets go |
 | `min_reduction` | `JEV_MIN_REDUCTION` | `0.25` | share of the history, 0 to 1, that stops the stack |
 | `max_state_tokens` | `JEV_MAX_STATE_TOKENS` | `25000` | token budget of the state |
 | `max_request_tokens` | `JEV_MAX_REQUEST_TOKENS` | `30000` | token budget of one request |

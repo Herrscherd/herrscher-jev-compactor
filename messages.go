@@ -20,6 +20,7 @@ const (
 	helpKeepThreshold        = "jev.setting.keep_threshold"
 	helpPreserveRecent       = "jev.setting.preserve_recent"
 	helpTruncateHead         = "jev.setting.truncate_head"
+	helpTruncateTail         = "jev.setting.truncate_tail"
 	helpMinReduction         = "jev.setting.min_reduction"
 	helpStateBudget          = "jev.setting.max_state_tokens"
 	helpRequestBudget        = "jev.setting.max_request_tokens"

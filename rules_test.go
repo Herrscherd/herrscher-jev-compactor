@@ -58,6 +58,8 @@ func TestParseRulesRefusesMalformedRules(t *testing.T) {
 		{"result threshold twice", "Edit:result_threshold=0.5,result_threshold=0.4"},
 		{"head zero", "Edit:head=0"},
 		{"head twice", "Edit:head=10,head=20"},
+		{"tail negative", "Edit:tail=-1"},
+		{"tail twice", "Edit:tail=10,tail=20"},
 		{"unknown key", "Edit:limit=10"},
 		{"trailing separator", "Edit:keep;"},
 	}

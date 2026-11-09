@@ -30,6 +30,11 @@
     "other": "characters kept at the head of a result Jev prunes"
   },
   {
+    "id": "jev.setting.truncate_tail",
+    "description": "Help of the truncate_tail setting",
+    "other": "characters kept at the tail of a result Jev prunes"
+  },
+  {
     "id": "jev.setting.min_reduction",
     "description": "Help of the min_reduction setting",
     "other": "share of the history from 0 to 1 the stage must remove to stop the compaction stack"
@@ -67,7 +72,7 @@
   {
     "id": "jev.setting.rules",
     "description": "Help of the rules setting: per-tool actions, as motif[,motif]:action[,action] rules separated by semicolons",
-    "other": "per-tool rules as motif[,motif]:action[,action] separated by semicolons, first match wins, actions keep, prune, truncate, threshold=, call_threshold=, result_threshold=, head="
+    "other": "per-tool rules as motif[,motif]:action[,action] separated by semicolons, first match wins, actions keep, prune, truncate, threshold=, call_threshold=, result_threshold=, head=, tail="
   },
   {
     "id": "jev.setting.pin_inputs",

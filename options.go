@@ -21,6 +21,7 @@ const (
 	settingKeepResultThreshold  = "keep_result_threshold"
 	settingPreserveRecent       = "preserve_recent"
 	settingTruncateHead         = "truncate_head"
+	settingTruncateTail         = "truncate_tail"
 	settingMinReduction         = "min_reduction"
 	settingMaxStateTokens       = "max_state_tokens"
 	settingMaxRequestTokens     = "max_request_tokens"
@@ -55,6 +56,7 @@ const (
 	defaultKeepThreshold    = 0.5
 	defaultPreserveRecent   = 6
 	defaultTruncateHead     = 300
+	defaultTruncateTail     = 0
 	defaultMinReduction     = 0.25
 	defaultMaxStateTokens   = 25000
 	defaultMaxRequestTokens = 30000
@@ -170,6 +172,7 @@ type options struct {
 	keepResult           optionalRatio
 	preserveRecent       int
 	truncateHead         int
+	truncateTail         int
 	minReduction         float64
 	maxStateTokens       int
 	maxRequestTokens     int
@@ -272,6 +275,7 @@ func settings(texts *messages) []contracts.Setting {
 		{Key: settingKeepResultThreshold, Env: "JEV_KEEP_RESULT_THRESHOLD", Help: texts.english(helpKeepResultThreshold, nil)},
 		{Key: settingPreserveRecent, Env: "JEV_PRESERVE_RECENT", Help: texts.english(helpPreserveRecent, nil), Default: strconv.Itoa(defaultPreserveRecent)},
 		{Key: settingTruncateHead, Env: "JEV_TRUNCATE_HEAD", Help: texts.english(helpTruncateHead, nil), Default: strconv.Itoa(defaultTruncateHead)},
+		{Key: settingTruncateTail, Env: "JEV_TRUNCATE_TAIL", Help: texts.english(helpTruncateTail, nil), Default: strconv.Itoa(defaultTruncateTail)},
 		{Key: settingMinReduction, Env: "JEV_MIN_REDUCTION", Help: texts.english(helpMinReduction, nil), Default: strconv.FormatFloat(defaultMinReduction, 'g', -1, 64)},
 		{Key: settingMaxStateTokens, Env: "JEV_MAX_STATE_TOKENS", Help: texts.english(helpStateBudget, nil), Default: strconv.Itoa(defaultMaxStateTokens)},
 		{Key: settingMaxRequestTokens, Env: "JEV_MAX_REQUEST_TOKENS", Help: texts.english(helpRequestBudget, nil), Default: strconv.Itoa(defaultMaxRequestTokens)},
@@ -315,6 +319,7 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 		keepResult:           read.optionalRatio(settingKeepResultThreshold),
 		preserveRecent:       read.count(settingPreserveRecent, defaultPreserveRecent, 0),
 		truncateHead:         read.count(settingTruncateHead, defaultTruncateHead, 0),
+		truncateTail:         read.count(settingTruncateTail, defaultTruncateTail, 0),
 		minReduction:         read.ratio(settingMinReduction, defaultMinReduction),
 		maxStateTokens:       read.count(settingMaxStateTokens, defaultMaxStateTokens, 1),
 		maxRequestTokens:     read.count(settingMaxRequestTokens, defaultMaxRequestTokens, 1),
