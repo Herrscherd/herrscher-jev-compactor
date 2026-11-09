@@ -26,6 +26,7 @@ const (
 	helpRequestBudget        = "jev.setting.max_request_tokens"
 	helpTimeout              = "jev.setting.timeout"
 	helpMaxParallel          = "jev.setting.max_parallel"
+	helpTriggerPercent       = "jev.setting.trigger_percent"
 	helpOnShort              = "jev.setting.on_short"
 	helpReductionUnit        = "jev.setting.reduction_unit"
 	helpDryRun               = "jev.setting.dry_run"

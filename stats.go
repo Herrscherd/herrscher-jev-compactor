@@ -32,6 +32,8 @@ func (r *compactRun) examine(report planReport) {
 	r.stats.Pinned = report.pinned
 	r.stats.Requests = report.sent.requests
 	r.stats.RequestTokens = report.sent.tokens
+	r.stats.StateTokens = report.state.tokens
+	r.stats.StateReduction = report.state.stage
 }
 
 func (r *compactRun) chars(before, after int) {
