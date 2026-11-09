@@ -141,39 +141,6 @@ func wholePercent(ratio float64) int {
 	return int(math.Floor(ratio * percent))
 }
 
-func (c *compactor) plan(ctx context.Context, history contracts.History, instruction string) ([]contracts.HistoryEdit, error) {
-	calls := collectCalls(history, c.opts.preserveRecent)
-	var candidates []toolCall
-	for _, call := range calls {
-		if !call.pinned {
-			candidates = append(candidates, call)
-		}
-	}
-	if len(candidates) == 0 {
-		return nil, nil
-	}
-	fitted, err := fitState(history, calls, goalOf(history, instruction), c.opts)
-	if err != nil {
-		return nil, err
-	}
-	slog.Debug("jev: state fitted", "stage", fitted.stage, "tokens", fitted.tokens)
-	batches, err := batchCalls(candidates, fitted.tokens, c.opts.maxRequestTokens)
-	if err != nil {
-		return nil, err
-	}
-	answers, err := c.askAll(ctx, fitted.state, batches)
-	if err != nil {
-		return nil, err
-	}
-	var edits []contracts.HistoryEdit
-	for _, call := range candidates {
-		if edit, prune := editFor(call, decide(call, answers[call.ref], c.opts.keepThreshold), c.opts.truncateHead); prune {
-			edits = append(edits, edit)
-		}
-	}
-	return edits, nil
-}
-
 func (c *compactor) askAll(ctx context.Context, state compactionState, batches [][]toolCall) (map[string]callAnswer, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

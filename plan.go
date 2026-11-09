@@ -1,8 +1,10 @@
 package jev
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	contracts "github.com/Herrscherd/herrscher-contracts"
 )
@@ -27,6 +29,11 @@ type question struct {
 type callAnswer struct {
 	keepCall   float64
 	keepResult float64
+}
+
+type thresholds struct {
+	call   float64
+	result float64
 }
 
 type decision int
@@ -77,11 +84,11 @@ func batchCalls(candidates []toolCall, stateTokens, maxRequestTokens int) ([][]t
 	return batches, nil
 }
 
-func decide(call toolCall, answer callAnswer, keepThreshold float64) decision {
+func decideWith(call toolCall, answer callAnswer, keep thresholds) decision {
 	switch {
-	case call.pinned, answer.keepResult >= keepThreshold:
+	case call.pinned, answer.keepResult >= keep.result:
 		return decisionKeep
-	case answer.keepCall >= keepThreshold:
+	case answer.keepCall >= keep.call:
 		return decisionPruneResult
 	default:
 		return decisionPruneCall
@@ -101,4 +108,113 @@ func editFor(call toolCall, verdict decision, truncateHead int) (contracts.Histo
 		return contracts.HistoryEdit{CallID: call.source.ID, Action: contracts.PruneCall}, true
 	}
 	return contracts.HistoryEdit{}, false
+}
+
+func removedRunes(call toolCall, edit contracts.HistoryEdit) int {
+	switch edit.Action {
+	case contracts.PruneResult:
+		return max(call.resultRunes()-edit.KeepChars, 0)
+	case contracts.PruneCall:
+		return call.resultRunes()
+	}
+	return 0
+}
+
+func historyRunes(history contracts.History) int {
+	total := textRunes(history)
+	for index := range history.Messages {
+		for _, call := range history.Messages[index].Calls {
+			total += runeCount(call.Input) + runeCount(call.Result)
+		}
+	}
+	return total
+}
+
+func (o options) thresholdsFor(picked rule) thresholds {
+	return thresholds{
+		call:   picked.callKeep.or(o.callKeepThreshold()),
+		result: picked.resultKeep.or(o.resultKeepThreshold()),
+	}
+}
+
+func (c *compactor) plan(ctx context.Context, history contracts.History, instruction string) ([]contracts.HistoryEdit, error) {
+	calls := collectCalls(history, c.opts.preserveRecent)
+	decided, asked := c.decideLocally(calls)
+	if len(asked) > 0 {
+		answers, err := c.judge(ctx, history, calls, asked, instruction)
+		if err != nil {
+			return nil, err
+		}
+		c.decideAsked(asked, answers, decided)
+	}
+	return c.withinBudget(history, calls, decided), nil
+}
+
+func (c *compactor) decideLocally(calls []toolCall) (map[string]plannedEdit, []toolCall) {
+	decided := make(map[string]plannedEdit)
+	var asked []toolCall
+	for _, call := range calls {
+		if call.pinned || c.kept(call) {
+			continue
+		}
+		picked := c.opts.policy.ruleFor(call.source.Tool)
+		if picked.action == 0 {
+			asked = append(asked, call)
+			continue
+		}
+		if edit, ok := c.verdictEdit(call, picked.action.decision(), orDefault(picked.head, c.opts.truncateHead), ruleDecided); ok {
+			decided[call.ref] = edit
+		}
+	}
+	return decided, asked
+}
+
+func (c *compactor) decideAsked(asked []toolCall, answers map[string]callAnswer, decided map[string]plannedEdit) {
+	for _, call := range asked {
+		picked := c.opts.policy.ruleFor(call.source.Tool)
+		answer := answers[call.ref]
+		verdict := decideWith(call, answer, c.opts.thresholdsFor(picked))
+		keep := max(answer.keepCall, answer.keepResult)
+		if edit, ok := c.verdictEdit(call, verdict, orDefault(picked.head, c.opts.truncateHead), keep); ok {
+			decided[call.ref] = edit
+		}
+	}
+}
+
+func (c *compactor) kept(call toolCall) bool {
+	return call.resultRunes() < c.opts.minResultChars || c.opts.policy.pinned(call.source.Input)
+}
+
+func (c *compactor) judge(ctx context.Context, history contracts.History, calls, asked []toolCall, instruction string) (map[string]callAnswer, error) {
+	fitted, err := fitState(history, calls, goalOf(history, instruction), c.opts)
+	if err != nil {
+		return nil, err
+	}
+	slog.Debug("jev: state fitted", "stage", fitted.stage, "tokens", fitted.tokens)
+	batches, err := batchCalls(asked, fitted.tokens, c.opts.maxRequestTokens)
+	if err != nil {
+		return nil, err
+	}
+	return c.askAll(ctx, fitted.state, batches)
+}
+
+func (c *compactor) verdictEdit(call toolCall, verdict decision, head int, keep float64) (plannedEdit, bool) {
+	if c.opts.keepErrors && call.source.ResultIsError && verdict == decisionPruneCall {
+		verdict = decisionPruneResult
+	}
+	edit, prune := editFor(call, verdict, head)
+	if !prune {
+		return plannedEdit{}, false
+	}
+	return plannedEdit{edit: edit, keep: keep, removed: removedRunes(call, edit)}, true
+}
+
+func (c *compactor) withinBudget(history contracts.History, calls []toolCall, decided map[string]plannedEdit) []contracts.HistoryEdit {
+	var planned []plannedEdit
+	for _, call := range calls {
+		if edit, ok := decided[call.ref]; ok {
+			planned = append(planned, edit)
+		}
+	}
+	return fitBudget(planned, c.opts.budget(), historyRunes(history))
 }

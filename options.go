@@ -12,19 +12,27 @@ import (
 )
 
 const (
-	settingAPIKey           = "api_key"
-	settingModel            = "model"
-	settingEndpoint         = "endpoint"
-	settingKeepThreshold    = "keep_threshold"
-	settingPreserveRecent   = "preserve_recent"
-	settingTruncateHead     = "truncate_head"
-	settingMinReduction     = "min_reduction"
-	settingMaxStateTokens   = "max_state_tokens"
-	settingMaxRequestTokens = "max_request_tokens"
-	settingTimeout          = "timeout"
-	settingMaxParallel      = "max_parallel"
-	settingOnShort          = "on_short"
-	settingDryRun           = "dry_run"
+	settingAPIKey              = "api_key"
+	settingModel               = "model"
+	settingEndpoint            = "endpoint"
+	settingKeepThreshold       = "keep_threshold"
+	settingKeepCallThreshold   = "keep_call_threshold"
+	settingKeepResultThreshold = "keep_result_threshold"
+	settingPreserveRecent      = "preserve_recent"
+	settingTruncateHead        = "truncate_head"
+	settingMinReduction        = "min_reduction"
+	settingMaxStateTokens      = "max_state_tokens"
+	settingMaxRequestTokens    = "max_request_tokens"
+	settingTimeout             = "timeout"
+	settingMaxParallel         = "max_parallel"
+	settingOnShort             = "on_short"
+	settingDryRun              = "dry_run"
+	settingRules               = "rules"
+	settingPinInputs           = "pin_inputs"
+	settingKeepErrors          = "keep_errors"
+	settingMinResultChars      = "min_result_chars"
+	settingMaxPruned           = "max_pruned"
+	settingMaxRemovedShare     = "max_removed_share"
 )
 
 const (
@@ -40,6 +48,9 @@ const (
 	defaultTimeout          = 2 * time.Minute
 	defaultMaxParallel      = 4
 	defaultOnShort          = onShortKeep
+	defaultKeepErrors       = false
+	defaultMinResultChars   = 0
+	defaultMaxPruned        = 0
 )
 
 type onShort uint8
@@ -51,7 +62,7 @@ const (
 
 func parseOnShort(text string) (onShort, bool) {
 	switch text {
-	case "keep":
+	case keepName:
 		return onShortKeep, true
 	case "done":
 		return onShortDone, true
@@ -105,11 +116,25 @@ func (*missingKeyError) Notice() contracts.Notice {
 	}
 }
 
+type optionalRatio struct {
+	value float64
+	set   bool
+}
+
+func (r optionalRatio) or(fallback float64) float64 {
+	if r.set {
+		return r.value
+	}
+	return fallback
+}
+
 type options struct {
 	apiKey           string
 	model            string
 	endpoint         string
 	keepThreshold    float64
+	keepCall         optionalRatio
+	keepResult       optionalRatio
 	preserveRecent   int
 	truncateHead     int
 	minReduction     float64
@@ -119,6 +144,11 @@ type options struct {
 	maxParallel      int
 	onShort          onShort
 	dryRun           bool
+	policy           *callPolicy
+	keepErrors       bool
+	minResultChars   int
+	maxPruned        int
+	maxRemovedShare  float64
 }
 
 func (o options) parallelism() int {
@@ -127,6 +157,18 @@ func (o options) parallelism() int {
 
 func (o options) shortRule() onShort {
 	return orDefault(o.onShort, defaultOnShort)
+}
+
+func (o options) callKeepThreshold() float64 {
+	return o.keepCall.or(o.keepThreshold)
+}
+
+func (o options) resultKeepThreshold() float64 {
+	return o.keepResult.or(o.keepThreshold)
+}
+
+func (o options) budget() budget {
+	return budget{maxPruned: o.maxPruned, maxRemovedShare: o.maxRemovedShare}
 }
 
 func orDefault[T comparable](value, fallback T) T {
@@ -143,6 +185,8 @@ func settings(texts *messages) []contracts.Setting {
 		{Key: settingModel, Env: "JEV_MODEL", Help: texts.english(helpModel, nil), Default: defaultModel},
 		{Key: settingEndpoint, Env: "JEV_ENDPOINT", Help: texts.english(helpEndpoint, nil), Default: defaultEndpoint},
 		{Key: settingKeepThreshold, Env: "JEV_KEEP_THRESHOLD", Help: texts.english(helpKeepThreshold, nil), Default: strconv.FormatFloat(defaultKeepThreshold, 'g', -1, 64)},
+		{Key: settingKeepCallThreshold, Env: "JEV_KEEP_CALL_THRESHOLD", Help: texts.english(helpKeepCallThreshold, nil)},
+		{Key: settingKeepResultThreshold, Env: "JEV_KEEP_RESULT_THRESHOLD", Help: texts.english(helpKeepResultThreshold, nil)},
 		{Key: settingPreserveRecent, Env: "JEV_PRESERVE_RECENT", Help: texts.english(helpPreserveRecent, nil), Default: strconv.Itoa(defaultPreserveRecent)},
 		{Key: settingTruncateHead, Env: "JEV_TRUNCATE_HEAD", Help: texts.english(helpTruncateHead, nil), Default: strconv.Itoa(defaultTruncateHead)},
 		{Key: settingMinReduction, Env: "JEV_MIN_REDUCTION", Help: texts.english(helpMinReduction, nil), Default: strconv.FormatFloat(defaultMinReduction, 'g', -1, 64)},
@@ -150,8 +194,14 @@ func settings(texts *messages) []contracts.Setting {
 		{Key: settingMaxRequestTokens, Env: "JEV_MAX_REQUEST_TOKENS", Help: texts.english(helpRequestBudget, nil), Default: strconv.Itoa(defaultMaxRequestTokens)},
 		{Key: settingTimeout, Env: "JEV_TIMEOUT", Help: texts.english(helpTimeout, nil), Default: defaultTimeout.String()},
 		{Key: settingMaxParallel, Env: "JEV_MAX_PARALLEL", Help: texts.english(helpMaxParallel, nil), Default: strconv.Itoa(defaultMaxParallel)},
-		{Key: settingOnShort, Env: "JEV_ON_SHORT", Help: texts.english(helpOnShort, nil), Default: "keep"},
+		{Key: settingOnShort, Env: "JEV_ON_SHORT", Help: texts.english(helpOnShort, nil), Default: keepName},
 		{Key: settingDryRun, Env: "JEV_DRY_RUN", Help: texts.english(helpDryRun, nil), Default: "false"},
+		{Key: settingRules, Env: "JEV_RULES", Help: texts.english(helpRules, nil)},
+		{Key: settingPinInputs, Env: "JEV_PIN_INPUTS", Help: texts.english(helpPinInputs, nil)},
+		{Key: settingKeepErrors, Env: "JEV_KEEP_ERRORS", Help: texts.english(helpKeepErrors, nil), Default: strconv.FormatBool(defaultKeepErrors)},
+		{Key: settingMinResultChars, Env: "JEV_MIN_RESULT_CHARS", Help: texts.english(helpMinResultChars, nil), Default: strconv.Itoa(defaultMinResultChars)},
+		{Key: settingMaxPruned, Env: "JEV_MAX_PRUNED", Help: texts.english(helpMaxPruned, nil), Default: strconv.Itoa(defaultMaxPruned)},
+		{Key: settingMaxRemovedShare, Env: "JEV_MAX_REMOVED_SHARE", Help: texts.english(helpMaxRemovedShare, nil), Default: strconv.FormatFloat(fullShare, 'g', -1, 64)},
 	}
 }
 
@@ -166,6 +216,8 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 		model:            read.text(settingModel, defaultModel),
 		endpoint:         read.endpoint(),
 		keepThreshold:    read.ratio(settingKeepThreshold, defaultKeepThreshold),
+		keepCall:         read.optionalRatio(settingKeepCallThreshold),
+		keepResult:       read.optionalRatio(settingKeepResultThreshold),
 		preserveRecent:   read.count(settingPreserveRecent, defaultPreserveRecent, 0),
 		truncateHead:     read.count(settingTruncateHead, defaultTruncateHead, 0),
 		minReduction:     read.ratio(settingMinReduction, defaultMinReduction),
@@ -175,6 +227,11 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 		maxParallel:      read.count(settingMaxParallel, 0, 1),
 		onShort:          read.onShort(),
 		dryRun:           read.flag(settingDryRun),
+		policy:           read.policy(),
+		keepErrors:       read.flag(settingKeepErrors),
+		minResultChars:   read.count(settingMinResultChars, defaultMinResultChars, 0),
+		maxPruned:        read.count(settingMaxPruned, defaultMaxPruned, 0),
+		maxRemovedShare:  read.share(settingMaxRemovedShare),
 	}
 	if read.err != nil {
 		return options{}, read.err
@@ -218,13 +275,41 @@ func (r *settingReader) endpoint() string {
 	return parsed.String()
 }
 
+func parseRatio(text string) (float64, bool) {
+	parsed, err := strconv.ParseFloat(text, 64)
+	if err != nil || math.IsNaN(parsed) || parsed < 0 || parsed > 1 {
+		return 0, false
+	}
+	return parsed, true
+}
+
 func (r *settingReader) ratio(key string, fallback float64) float64 {
 	value, ok := r.raw(key)
 	if !ok {
 		return fallback
 	}
-	parsed, err := strconv.ParseFloat(value, 64)
-	if err != nil || math.IsNaN(parsed) || parsed < 0 || parsed > 1 {
+	parsed, valid := parseRatio(value)
+	if !valid {
+		r.refuse(key, value)
+		return 0
+	}
+	return parsed
+}
+
+func (r *settingReader) optionalRatio(key string) optionalRatio {
+	if _, ok := r.raw(key); !ok {
+		return optionalRatio{}
+	}
+	return optionalRatio{value: r.ratio(key, 0), set: true}
+}
+
+func (r *settingReader) share(key string) float64 {
+	value, ok := r.raw(key)
+	if !ok {
+		return 0
+	}
+	parsed, valid := parseRatio(value)
+	if !valid || parsed == 0 {
 		r.refuse(key, value)
 		return 0
 	}
@@ -255,6 +340,30 @@ func (r *settingReader) onShort() onShort {
 		return 0
 	}
 	return parsed
+}
+
+func (r *settingReader) policy() *callPolicy {
+	rulesText, hasRules := r.raw(settingRules)
+	pinsText, hasPins := r.raw(settingPinInputs)
+	if !hasRules && !hasPins {
+		return nil
+	}
+	policy := &callPolicy{}
+	if hasRules {
+		parsed, valid := parseRules(rulesText)
+		if !valid {
+			r.refuse(settingRules, rulesText)
+		}
+		policy.rules = parsed
+	}
+	if hasPins {
+		pins, valid := parseList(pinsText, nonEmpty)
+		if !valid {
+			r.refuse(settingPinInputs, pinsText)
+		}
+		policy.pins = pins
+	}
+	return policy
 }
 
 func (r *settingReader) flag(key string) bool {

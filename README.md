@@ -69,7 +69,8 @@ setting.
 4. Ask two questions per unpinned call: should the call stay, and should its
    full output stay. Questions are batched so state and questions fit
    `max_request_tokens`, and batches run in parallel, four at most.
-5. Decide per call, against `keep_threshold`:
+5. Decide per call, against `keep_call_threshold` and `keep_result_threshold`
+   (both default to `keep_threshold`), or the thresholds of the call's rule:
    - the output is still needed: keep the call untouched;
    - only the call is: keep its first `truncate_head` characters of output
      (`PruneResult`), when the output is longer than that by more than 120;
@@ -80,6 +81,34 @@ setting.
    backend's own compaction runs only when pruning was not enough. The share
    is measured against the whole history, message text included, not only
    against the tool inputs and outputs the pruning touches.
+
+### Rules, pins and budgets
+
+`pin_inputs` keeps, without asking Jev, every call whose input contains one of
+its substrings, and every output shorter than `min_result_chars`. The newest
+messages and the first message stay pinned as before.
+
+`rules` sets what happens to the calls of a given tool, without asking Jev for
+them. A rule is `motif[,motif]:action[,action]`, rules are separated by `;`,
+and the first rule whose motif matches the tool name wins. A motif is a
+`path.Match` glob such as `Read*`. The actions are `keep` (the call stays
+untouched), `prune` (the call is pruned, as `PruneCall`) and `truncate` (the
+output keeps `head` characters, as `PruneResult`). A rule with no action leaves
+the decision to Jev, judged against the thresholds it sets with `threshold=`,
+`call_threshold=` and `result_threshold=`, and against its `head`. For example:
+
+```bash
+export JEV_RULES='Edit,Write:keep;Bash:threshold=0.7,head=500;Grep:prune'
+```
+
+A call decided by a rule with an action is never asked about, and when a budget
+is exceeded such a decision is the last to be given back.
+
+`max_pruned` and `max_removed_share` cap one compaction. When the plan would
+prune more calls than `max_pruned`, or remove more than `max_removed_share` of
+the history, the pruning decisions carrying the highest keep probability (the
+ones Jev is least sure of) are demoted to keep first, until the plan fits.
+Decisions taken by a rule are demoted last.
 
 The goal Jev weighs each call against is the operator's instruction
 (`/compact <instruction>`), or the last three prompts of the user without one.
@@ -102,6 +131,14 @@ history cannot be read or pruned, or when its context is cancelled.
 | `model` | `JEV_MODEL` | `jev-latest` | Jev model asked |
 | `endpoint` | `JEV_ENDPOINT` | `https://api.typesafe.ai/v1/systemone` | System One URL, https only |
 | `keep_threshold` | `JEV_KEEP_THRESHOLD` | `0.5` | probability, 0 to 1, at or above which a call or its output stays |
+| `keep_call_threshold` | `JEV_KEEP_CALL_THRESHOLD` | `keep_threshold` | probability, 0 to 1, at or above which a call stays |
+| `keep_result_threshold` | `JEV_KEEP_RESULT_THRESHOLD` | `keep_threshold` | probability, 0 to 1, at or above which the full output stays |
+| `rules` | `JEV_RULES` | none | per-tool actions, see below |
+| `pin_inputs` | `JEV_PIN_INPUTS` | none | comma-separated substrings: a call whose input contains one always stays |
+| `keep_errors` | `JEV_KEEP_ERRORS` | `false` | `true` keeps the output of a failed call, so a pruned call keeps its error |
+| `min_result_chars` | `JEV_MIN_RESULT_CHARS` | `0` | outputs shorter than this many characters always stay |
+| `max_pruned` | `JEV_MAX_PRUNED` | `0` | most tool calls one compaction prunes, `0` for no limit |
+| `max_removed_share` | `JEV_MAX_REMOVED_SHARE` | `1` | most of the history, 0 to 1, one compaction may remove, `1` for no limit |
 | `preserve_recent` | `JEV_PRESERVE_RECENT` | `6` | newest messages whose calls are pinned |
 | `truncate_head` | `JEV_TRUNCATE_HEAD` | `300` | characters kept from an output Jev lets go |
 | `min_reduction` | `JEV_MIN_REDUCTION` | `0.25` | share of the history, 0 to 1, that stops the stack |

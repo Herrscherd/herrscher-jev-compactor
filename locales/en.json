@@ -65,6 +65,46 @@
     "other": "true computes what Jev would prune and changes nothing"
   },
   {
+    "id": "jev.setting.rules",
+    "description": "Help of the rules setting: per-tool actions, as motif[,motif]:action[,action] rules separated by semicolons",
+    "other": "per-tool rules as motif[,motif]:action[,action] separated by semicolons, first match wins, actions keep, prune, truncate, threshold=, call_threshold=, result_threshold=, head="
+  },
+  {
+    "id": "jev.setting.pin_inputs",
+    "description": "Help of the pin_inputs setting: substrings of a tool input whose calls are always kept",
+    "other": "comma-separated substrings: a tool call whose input contains one is always kept, without asking Jev"
+  },
+  {
+    "id": "jev.setting.keep_errors",
+    "description": "Help of the keep_errors setting",
+    "other": "true keeps the result of a failed tool call, so it is never pruned away with its call"
+  },
+  {
+    "id": "jev.setting.min_result_chars",
+    "description": "Help of the min_result_chars setting",
+    "other": "results shorter than this many characters are always kept, without asking Jev"
+  },
+  {
+    "id": "jev.setting.keep_call_threshold",
+    "description": "Help of the keep_call_threshold setting",
+    "other": "probability from 0 to 1 at or above which Jev keeps a call, defaults to keep_threshold"
+  },
+  {
+    "id": "jev.setting.keep_result_threshold",
+    "description": "Help of the keep_result_threshold setting",
+    "other": "probability from 0 to 1 at or above which Jev keeps the full result of a call, defaults to keep_threshold"
+  },
+  {
+    "id": "jev.setting.max_pruned",
+    "description": "Help of the max_pruned setting",
+    "other": "maximum number of tool calls pruned in one compaction, 0 for no limit"
+  },
+  {
+    "id": "jev.setting.max_removed_share",
+    "description": "Help of the max_removed_share setting",
+    "other": "maximum share from 0 to 1 of the history one compaction may remove, 1 for no limit"
+  },
+  {
     "id": "jev.note.failed",
     "description": "The Jev stage failed for Reason, pruned nothing and lets the next stage of the stack compact",
     "other": "Jev pruned nothing, the next stage compacts: {{.Reason}}"

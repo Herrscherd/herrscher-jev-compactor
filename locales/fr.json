@@ -65,6 +65,46 @@
     "other": "true calcule ce que Jev élaguerait sans rien modifier"
   },
   {
+    "id": "jev.setting.rules",
+    "description": "Help of the rules setting: per-tool actions, as motif[,motif]:action[,action] rules separated by semicolons",
+    "other": "règles par outil sous la forme motif[,motif]:action[,action], séparées par des points-virgules, la première qui correspond gagne, actions keep, prune, truncate, threshold=, call_threshold=, result_threshold=, head="
+  },
+  {
+    "id": "jev.setting.pin_inputs",
+    "description": "Help of the pin_inputs setting: substrings of a tool input whose calls are always kept",
+    "other": "sous-chaînes séparées par des virgules : un appel d'outil dont l'entrée en contient une est toujours gardé, sans demander à Jev"
+  },
+  {
+    "id": "jev.setting.keep_errors",
+    "description": "Help of the keep_errors setting",
+    "other": "true garde le résultat d'un appel d'outil en échec, pour qu'il ne soit pas élagué avec son appel"
+  },
+  {
+    "id": "jev.setting.min_result_chars",
+    "description": "Help of the min_result_chars setting",
+    "other": "les résultats plus courts que ce nombre de caractères sont toujours gardés, sans demander à Jev"
+  },
+  {
+    "id": "jev.setting.keep_call_threshold",
+    "description": "Help of the keep_call_threshold setting",
+    "other": "probabilité de 0 à 1 à partir de laquelle Jev garde un appel, vaut keep_threshold par défaut"
+  },
+  {
+    "id": "jev.setting.keep_result_threshold",
+    "description": "Help of the keep_result_threshold setting",
+    "other": "probabilité de 0 à 1 à partir de laquelle Jev garde le résultat complet d'un appel, vaut keep_threshold par défaut"
+  },
+  {
+    "id": "jev.setting.max_pruned",
+    "description": "Help of the max_pruned setting",
+    "other": "nombre maximal d'appels d'outil élagués en une compaction, 0 pour sans limite"
+  },
+  {
+    "id": "jev.setting.max_removed_share",
+    "description": "Help of the max_removed_share setting",
+    "other": "part maximale de 0 à 1 de l'historique qu'une compaction peut retirer, 1 pour sans limite"
+  },
+  {
     "id": "jev.note.failed",
     "description": "The Jev stage failed for Reason, pruned nothing and lets the next stage of the stack compact",
     "other": "Jev n'a rien élagué, l'étape suivante compacte : {{.Reason}}"
