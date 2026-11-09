@@ -11,11 +11,7 @@ import (
 	contracts "github.com/Herrscherd/herrscher-contracts"
 )
 
-const (
-	nestedInputRunes = 200
-	goalPrompts      = 3
-	goalPromptRunes  = 500
-)
+const nestedInputRunes = 200
 
 var errInputNotObject = errors.New("tool input is not a JSON object")
 
@@ -56,23 +52,6 @@ func collectCalls(history contracts.History, preserveRecent int) []toolCall {
 		}
 	}
 	return calls
-}
-
-func goalOf(history contracts.History, instruction string) string {
-	if instruction = strings.TrimSpace(instruction); instruction != "" {
-		return instruction
-	}
-	var prompts []string
-	for index := range history.Messages {
-		message := history.Messages[index]
-		if message.Role == contracts.RoleUser && strings.TrimSpace(message.Text) != "" {
-			prompts = append(prompts, truncate(message.Text, goalPromptRunes))
-		}
-	}
-	if len(prompts) > goalPrompts {
-		prompts = prompts[len(prompts)-goalPrompts:]
-	}
-	return strings.Join(prompts, "\n")
 }
 
 func compactCallLine(call toolCall, inputRunes int) string {

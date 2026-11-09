@@ -130,6 +130,26 @@
     "other": "ordered list of the state reduction stages allowed, among abridge_texts, collapse_messages, compact_calls, leave_out, merge_calls"
   },
   {
+    "id": "jev.setting.goal_source",
+    "description": "Help of the goal_source setting: where the goal Jev reads comes from",
+    "other": "where the goal Jev reads comes from: auto takes the instruction then the last user prompts, prompts always the last user prompts, fixed always goal_text"
+  },
+  {
+    "id": "jev.setting.goal_text",
+    "description": "Help of the goal_text setting: the fixed goal Jev reads, required when goal_source is fixed",
+    "other": "goal Jev reads when goal_source is fixed, required then"
+  },
+  {
+    "id": "jev.setting.goal_prompts",
+    "description": "Help of the goal_prompts setting: how many of the last user prompts make the goal",
+    "other": "number of the last user prompts that make the goal, at least 1"
+  },
+  {
+    "id": "jev.setting.goal_prompt_runes",
+    "description": "Help of the goal_prompt_runes setting: characters kept of each user prompt in the goal",
+    "other": "characters kept of each user prompt in the goal, at least 1"
+  },
+  {
     "id": "jev.note.failed",
     "description": "The Jev stage failed for Reason, pruned nothing and lets the next stage of the stack compact",
     "other": "Jev pruned nothing, the next stage compacts: {{.Reason}}"

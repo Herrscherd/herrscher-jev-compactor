@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	contracts "github.com/Herrscherd/herrscher-contracts"
@@ -38,6 +39,10 @@ const (
 	settingStateTextTail       = "state_text_tail"
 	settingStateContext        = "state_context"
 	settingStateStages         = "state_stages"
+	settingGoalSource          = "goal_source"
+	settingGoalText            = "goal_text"
+	settingGoalPrompts         = "goal_prompts"
+	settingGoalPromptRunes     = "goal_prompt_runes"
 )
 
 const (
@@ -61,6 +66,8 @@ const (
 	defaultLineInputRunes   = 60
 	defaultTextHeadRunes    = 400
 	defaultTextTailRunes    = 150
+	defaultGoalPrompts      = 3
+	defaultGoalPromptRunes  = 500
 )
 
 type onShort uint8
@@ -164,6 +171,10 @@ type options struct {
 	stateTextTail    int
 	stateContext     string
 	stateStages      stageOrder
+	goalSource       goalSource
+	goalText         string
+	goalPrompts      int
+	goalPromptRunes  int
 }
 
 func (o options) parallelism() int {
@@ -206,6 +217,15 @@ func (o options) stateStageKinds() []stageKind {
 	return orDefault(o.stateStages, defaultStageOrder()).kinds()
 }
 
+func (o options) goalSettings() goalSpec {
+	return goalSpec{
+		source:      orDefault(o.goalSource, goalSourceAuto),
+		text:        o.goalText,
+		prompts:     orDefault(o.goalPrompts, defaultGoalPrompts),
+		promptRunes: orDefault(o.goalPromptRunes, defaultGoalPromptRunes),
+	}
+}
+
 func orDefault[T comparable](value, fallback T) T {
 	var zero T
 	if value == zero {
@@ -242,6 +262,10 @@ func settings(texts *messages) []contracts.Setting {
 		{Key: settingStateTextTail, Env: "JEV_STATE_TEXT_TAIL", Help: texts.english(helpStateTextTail, nil), Default: strconv.Itoa(defaultTextTailRunes)},
 		{Key: settingStateContext, Env: "JEV_STATE_CONTEXT", Help: texts.english(helpStateContext, nil)},
 		{Key: settingStateStages, Env: "JEV_STATE_STAGES", Help: texts.english(helpStateStages, nil), Default: defaultStageOrder().String()},
+		{Key: settingGoalSource, Env: "JEV_GOAL_SOURCE", Help: texts.english(helpGoalSource, nil), Default: "auto"},
+		{Key: settingGoalText, Env: "JEV_GOAL_TEXT", Help: texts.english(helpGoalText, nil)},
+		{Key: settingGoalPrompts, Env: "JEV_GOAL_PROMPTS", Help: texts.english(helpGoalPrompts, nil), Default: strconv.Itoa(defaultGoalPrompts)},
+		{Key: settingGoalPromptRunes, Env: "JEV_GOAL_PROMPT_RUNES", Help: texts.english(helpGoalPromptRunes, nil), Default: strconv.Itoa(defaultGoalPromptRunes)},
 	}
 }
 
@@ -277,6 +301,13 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 		stateTextTail:    read.count(settingStateTextTail, 0, 1),
 		stateContext:     read.text(settingStateContext, ""),
 		stateStages:      read.stageOrder(),
+		goalSource:       read.goalSource(),
+		goalText:         strings.TrimSpace(read.text(settingGoalText, "")),
+		goalPrompts:      read.count(settingGoalPrompts, 0, 1),
+		goalPromptRunes:  read.count(settingGoalPromptRunes, 0, 1),
+	}
+	if opts.goalSource == goalSourceFixed && opts.goalText == "" {
+		read.refuse(settingGoalText, "")
 	}
 	if read.err != nil {
 		return options{}, read.err
@@ -409,6 +440,19 @@ func (r *settingReader) stageOrder() stageOrder {
 	if !valid {
 		r.refuse(settingStateStages, value)
 		return stageOrder{}
+	}
+	return parsed
+}
+
+func (r *settingReader) goalSource() goalSource {
+	value, ok := r.raw(settingGoalSource)
+	if !ok {
+		return 0
+	}
+	parsed, valid := parseGoalSource(value)
+	if !valid {
+		r.refuse(settingGoalSource, value)
+		return 0
 	}
 	return parsed
 }

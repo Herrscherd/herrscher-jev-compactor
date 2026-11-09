@@ -186,7 +186,7 @@ func (c *compactor) kept(call toolCall) bool {
 }
 
 func (c *compactor) judge(ctx context.Context, history contracts.History, calls, asked []toolCall, instruction string) (map[string]callAnswer, error) {
-	fitted, err := fitState(history, calls, goalOf(history, instruction), c.opts)
+	fitted, err := fitState(history, calls, c.opts.goalSettings().goal(history, instruction), c.opts)
 	if err != nil {
 		return nil, err
 	}

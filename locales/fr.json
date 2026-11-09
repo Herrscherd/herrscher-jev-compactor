@@ -130,6 +130,26 @@
     "other": "liste ordonnée des étapes de réduction de l'état autorisées, parmi abridge_texts, collapse_messages, compact_calls, leave_out, merge_calls"
   },
   {
+    "id": "jev.setting.goal_source",
+    "description": "Help of the goal_source setting: where the goal Jev reads comes from",
+    "other": "origine du but lu par Jev : auto prend l'instruction puis les derniers messages utilisateur, prompts prend toujours les derniers messages utilisateur, fixed prend toujours goal_text"
+  },
+  {
+    "id": "jev.setting.goal_text",
+    "description": "Help of the goal_text setting: the fixed goal Jev reads, required when goal_source is fixed",
+    "other": "but lu par Jev quand goal_source vaut fixed, obligatoire alors"
+  },
+  {
+    "id": "jev.setting.goal_prompts",
+    "description": "Help of the goal_prompts setting: how many of the last user prompts make the goal",
+    "other": "nombre des derniers messages utilisateur qui forment le but, au moins 1"
+  },
+  {
+    "id": "jev.setting.goal_prompt_runes",
+    "description": "Help of the goal_prompt_runes setting: characters kept of each user prompt in the goal",
+    "other": "caractères gardés de chaque message utilisateur dans le but, au moins 1"
+  },
+  {
     "id": "jev.note.failed",
     "description": "The Jev stage failed for Reason, pruned nothing and lets the next stage of the stack compact",
     "other": "Jev n'a rien élagué, l'étape suivante compacte : {{.Reason}}"

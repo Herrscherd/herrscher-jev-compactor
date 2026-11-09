@@ -153,6 +153,10 @@ history cannot be read or pruned, or when its context is cancelled.
 | `state_text_tail` | `JEV_STATE_TEXT_TAIL` | `150` | characters kept at the tail of a long text when the state abridges it |
 | `state_context` | `JEV_STATE_CONTEXT` | built-in text | context text Jev reads, replacing the built-in one when set |
 | `state_stages` | `JEV_STATE_STAGES` | all, in order | ordered reduction stages allowed among `abridge_texts`, `collapse_messages`, `compact_calls`, `leave_out`, `merge_calls` |
+| `goal_source` | `JEV_GOAL_SOURCE` | `auto` | `auto` takes the instruction, then the last user prompts; `prompts` always takes the last user prompts; `fixed` always takes `goal_text` |
+| `goal_text` | `JEV_GOAL_TEXT` | none | the fixed goal, required when `goal_source` is `fixed` |
+| `goal_prompts` | `JEV_GOAL_PROMPTS` | `3` | number of the last user prompts that make the goal, at least 1 |
+| `goal_prompt_runes` | `JEV_GOAL_PROMPT_RUNES` | `500` | characters kept of each user prompt in the goal, at least 1 |
 
 Tokens are estimated without a tokenizer, with the weights fast-jev calibrated
 against what Jev reports: a word costs one token per six letters, a digit half
