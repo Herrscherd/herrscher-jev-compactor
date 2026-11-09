@@ -2,6 +2,8 @@ package jev
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	contracts "github.com/Herrscherd/herrscher-contracts"
@@ -63,9 +65,19 @@ func TestReductionUnitTokensMeasuresTheTargetInTokens(t *testing.T) {
 	}
 }
 
+func prunedSessionHistory() contracts.History {
+	history := sessionHistory()
+	long := strings.Repeat("line of output\n", 100)
+	calls := history.Messages[1].Calls
+	calls[1].Result = long[:defaultTruncateHead] + "\n" + fmt.Sprintf(prunedResultNote, runeCount(long[defaultTruncateHead:]))
+	calls[2].Result = prunedCallNote
+	return history
+}
+
 func TestReductionUnitTokensReachesATargetItsPlanMeets(t *testing.T) {
 	stage := newTestCompactor(t, &fakeJev{answers: sessionAnswers()}, map[string]string{settingMinReduction: "0.2", settingReductionUnit: "tokens"})
-	editor := &fakeHistory{history: sessionHistory(), outcome: contracts.PruneOutcome{Edited: 2, CharsBefore: 1000, CharsAfter: 600}}
+	after := prunedSessionHistory()
+	editor := &fakeHistory{history: sessionHistory(), afterPrune: &after, outcome: contracts.PruneOutcome{Edited: 2, CharsBefore: 1000, CharsAfter: 600}}
 	result, err := stage.Compact(t.Context(), contracts.CompactRequest{History: editor}, nil)
 	if err != nil {
 		t.Fatalf("Compact: %v", err)

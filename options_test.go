@@ -19,6 +19,7 @@ func TestParseOptionsAppliesTheDefaults(t *testing.T) {
 		truncateHead: defaultTruncateHead, truncateTail: defaultTruncateTail, minReduction: defaultMinReduction,
 		maxStateTokens: defaultMaxStateTokens, maxRequestTokens: defaultMaxRequestTokens,
 		timeout: defaultTimeout, retryBackoff: defaultRetryBackoff,
+		stateTextHead: defaultTextHeadRunes, stateTextTail: defaultTextTailRunes,
 	}
 	if opts != want {
 		t.Fatalf("parseOptions = %+v, want %+v", opts, want)
@@ -67,5 +68,31 @@ func TestParseOptionsNeedsAnAPIKey(t *testing.T) {
 	_, err := parseOptions(contracts.PluginConfig{})
 	if !errors.Is(err, ErrMissingAPIKey) || contracts.NoticeOf(err).Code != contracts.CodeSettingMissing {
 		t.Fatalf("parseOptions error = %v, want ErrMissingAPIKey with CodeSettingMissing", err)
+	}
+}
+
+func TestParseOptionsRefusesIncoherentSettings(t *testing.T) {
+	cases := map[string]map[string]string{
+		"state as large as the request": {settingMaxStateTokens: "30000", settingMaxRequestTokens: "30000"},
+		"state larger than the request": {settingMaxStateTokens: "40000", settingMaxRequestTokens: "30000"},
+		"target above the removal cap":  {settingMinReduction: "0.5", settingMaxRemovedShare: "0.3"},
+	}
+	for name, settings := range cases {
+		settings[settingAPIKey] = "key"
+		_, err := parseOptions(contracts.PluginConfig{Settings: settings})
+		if !errors.Is(err, ErrInvalidSetting) {
+			t.Errorf("%s: parseOptions error = %v, want ErrInvalidSetting", name, err)
+		}
+	}
+	coherent := map[string]string{
+		settingAPIKey:           "key",
+		settingMinReduction:     "0.5",
+		settingMaxRemovedShare:  "0.3",
+		settingReductionUnit:    "tokens",
+		settingMaxStateTokens:   "20000",
+		settingMaxRequestTokens: "30000",
+	}
+	if _, err := parseOptions(contracts.PluginConfig{Settings: coherent}); err != nil {
+		t.Fatalf("parseOptions(coherent) error = %v, want none", err)
 	}
 }

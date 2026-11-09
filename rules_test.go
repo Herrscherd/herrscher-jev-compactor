@@ -9,18 +9,20 @@ import (
 
 func TestParseRulesAcceptsTheDocumentedForms(t *testing.T) {
 	cases := []struct {
-		name     string
-		text     string
-		patterns []string
-		action   ruleAction
-		head     int
-		callKeep optionalRatio
-		resKeep  optionalRatio
+		name      string
+		text      string
+		patterns  []string
+		action    ruleAction
+		head      optionalCount
+		threshold optionalRatio
+		callKeep  optionalRatio
+		resKeep   optionalRatio
 	}{
 		{name: "keep several motifs", text: "Edit,Write:keep", patterns: []string{"Edit", "Write"}, action: actionKeep},
 		{name: "prune", text: "Grep:prune", patterns: []string{"Grep"}, action: actionPrune},
 		{name: "glob", text: "Read*:truncate", patterns: []string{"Read*"}, action: actionTruncate},
-		{name: "both thresholds", text: "Bash:threshold=0.7,head=500", patterns: []string{"Bash"}, head: 500, callKeep: optionalRatio{value: 0.7, set: true}, resKeep: optionalRatio{value: 0.7, set: true}},
+		{name: "threshold for both channels", text: "Bash:threshold=0.7,head=500", patterns: []string{"Bash"}, head: optionalCount{value: 500, set: true}, threshold: optionalRatio{value: 0.7, set: true}},
+		{name: "head zero", text: "Edit:head=0", patterns: []string{"Edit"}, head: optionalCount{value: 0, set: true}},
 		{name: "call threshold only", text: "Bash:call_threshold=0.2", patterns: []string{"Bash"}, callKeep: optionalRatio{value: 0.2, set: true}},
 		{name: "result threshold only", text: "Bash:result_threshold=1", patterns: []string{"Bash"}, resKeep: optionalRatio{value: 1, set: true}},
 		{name: "spaces around motifs", text: " Edit , Write : keep ", patterns: []string{"Edit", "Write"}, action: actionKeep},
@@ -32,8 +34,8 @@ func TestParseRulesAcceptsTheDocumentedForms(t *testing.T) {
 				t.Fatalf("parseRules(%q) = %+v, %v, want one rule", tc.text, rules, ok)
 			}
 			got := rules[0]
-			if !equalStrings(got.patterns, tc.patterns) || got.action != tc.action || got.head != tc.head || got.callKeep != tc.callKeep || got.resultKeep != tc.resKeep {
-				t.Fatalf("parseRules(%q) = %+v, want patterns %v action %v head %d", tc.text, got, tc.patterns, tc.action, tc.head)
+			if !equalStrings(got.patterns, tc.patterns) || got.action != tc.action || got.head != tc.head || got.threshold != tc.threshold || got.callKeep != tc.callKeep || got.resultKeep != tc.resKeep {
+				t.Fatalf("parseRules(%q) = %+v, want patterns %v action %v head %+v", tc.text, got, tc.patterns, tc.action, tc.head)
 			}
 		})
 	}
@@ -54,9 +56,8 @@ func TestParseRulesRefusesMalformedRules(t *testing.T) {
 		{"two actions", "Edit:keep,prune"},
 		{"threshold above one", "Edit:threshold=2"},
 		{"threshold not a number", "Edit:call_threshold=high"},
-		{"threshold twice", "Edit:threshold=0.5,call_threshold=0.4"},
+		{"threshold twice", "Edit:threshold=0.5,threshold=0.4"},
 		{"result threshold twice", "Edit:result_threshold=0.5,result_threshold=0.4"},
-		{"head zero", "Edit:head=0"},
 		{"head twice", "Edit:head=10,head=20"},
 		{"tail negative", "Edit:tail=-1"},
 		{"tail twice", "Edit:tail=10,tail=20"},
@@ -146,4 +147,26 @@ func equalStrings(left, right []string) bool {
 		}
 	}
 	return true
+}
+
+func TestRuleThresholdsAreDefaultsWhateverTheOrder(t *testing.T) {
+	for _, text := range []string{"Edit:threshold=0.5,call_threshold=0.4", "Edit:call_threshold=0.4,threshold=0.5"} {
+		parsed, ok := parseRule(text)
+		if !ok {
+			t.Fatalf("parseRule(%q) refused, want both thresholds accepted", text)
+		}
+		if got := (options{}).thresholdsFor(parsed); got.call != 0.4 || got.result != 0.5 {
+			t.Fatalf("parseRule(%q) thresholds = %+v, want the specific call threshold 0.4 and the default 0.5 for results", text, got)
+		}
+	}
+}
+
+func TestRuleHeadZeroKeepsNothingOfTheResultHead(t *testing.T) {
+	parsed, ok := parseRule("Edit:head=0")
+	if !ok {
+		t.Fatal("parseRule(Edit:head=0) refused")
+	}
+	if got := (options{truncateHead: 300}).truncationFor(parsed); got.head != 0 {
+		t.Fatalf("truncation head = %d, want 0 from the rule", got.head)
+	}
 }

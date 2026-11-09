@@ -114,3 +114,31 @@ func TestKeepCacheIsBounded(t *testing.T) {
 		t.Fatalf("cache holds %d entries, want at most %d", size, keepCacheLimit)
 	}
 }
+
+func TestKeepCacheFlushesWhenANewKeyArrivesFull(t *testing.T) {
+	cache := newKeepCache()
+	for index := range keepCacheLimit {
+		cache.store(keepKey{call: strconv.Itoa(index)}, "digest")
+	}
+	cache.store(keepKey{call: "fresh"}, "digest")
+	if size := len(cache.digests); size != 1 {
+		t.Fatalf("size after a new key in a full cache = %d, want the flush to leave only that key", size)
+	}
+	if !cache.holds(keepKey{call: "fresh"}, "digest") || cache.holds(keepKey{call: "0"}, "digest") {
+		t.Fatal("after the flush the new key must be held and the old ones forgotten")
+	}
+}
+
+func TestKeepCacheUpdatesAKnownKeyWhenFullWithoutFlushing(t *testing.T) {
+	cache := newKeepCache()
+	for index := range keepCacheLimit {
+		cache.store(keepKey{call: strconv.Itoa(index)}, "digest")
+	}
+	cache.store(keepKey{call: "0"}, "changed")
+	if size := len(cache.digests); size != keepCacheLimit {
+		t.Fatalf("size = %d, want the known key updated in place", size)
+	}
+	if !cache.holds(keepKey{call: "0"}, "changed") || !cache.holds(keepKey{call: "1"}, "digest") {
+		t.Fatal("updating a known key must keep the other entries")
+	}
+}

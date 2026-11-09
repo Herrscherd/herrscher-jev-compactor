@@ -103,3 +103,15 @@ func callIDs(edits []contracts.HistoryEdit) []string {
 	}
 	return ids
 }
+
+func TestFitBudgetCountsTruncationsAgainstMaxPruned(t *testing.T) {
+	planned := []plannedEdit{
+		{edit: contracts.HistoryEdit{CallID: "a", Action: contracts.PruneResult, KeepChars: 300}, keep: 0.1},
+		{edit: contracts.HistoryEdit{CallID: "b", Action: contracts.PruneResult, KeepChars: 300}, keep: 0.2},
+		{edit: contracts.HistoryEdit{CallID: "c", Action: contracts.PruneCall}, keep: 0.3},
+	}
+	edits := fitBudget(planned, budget{maxPruned: 2}, 1000)
+	if len(edits) != 2 {
+		t.Fatalf("edits = %d, want 2: truncations count against max_pruned too", len(edits))
+	}
+}

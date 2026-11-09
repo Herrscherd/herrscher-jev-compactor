@@ -3,6 +3,7 @@ package jev
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -69,7 +70,7 @@ func TestCompactStatsReportTheOutcomeOfEachPath(t *testing.T) {
 			history:  &fakeHistory{history: sessionHistory()},
 			want: contracts.CompactStats{
 				Stage: compactorKind, Outcome: contracts.CompactDryRun, Calls: 5, Kept: 3, Truncated: 1, Pruned: 1,
-				Pinned: 1, CharsBefore: before, CharsAfter: before - 2700, Requests: 1,
+				Pinned: 1, CharsBefore: before, CharsAfter: before - 2598, Requests: 1,
 			},
 		},
 		"skipped when every call is pinned": {
@@ -155,9 +156,11 @@ func TestCompactStatsMeasureTheRequestAndTheTokensRemoved(t *testing.T) {
 		t.Fatalf("Compact: %v", err)
 	}
 	long := strings.Repeat("line of output\n", 100)
-	wantTokensRemoved := estimateTokens(long[defaultTruncateHead:]) + estimateTokens(long)
+	cut := long[defaultTruncateHead:]
+	wantTokensRemoved := estimateTokens(cut) - estimateTokens("\n"+fmt.Sprintf(prunedResultNote, runeCount(cut))) +
+		estimateTokens(long) - estimateTokens(prunedCallNote)
 	if got := result.Stats.TokensRemoved; got != wantTokensRemoved {
-		t.Fatalf("TokensRemoved = %d, want %d: the head-cut tail plus the pruned result", got, wantTokensRemoved)
+		t.Fatalf("TokensRemoved = %d, want %d: the removed text less the note that replaces it", got, wantTokensRemoved)
 	}
 	sent, err := encodeJSON(server.requests[0])
 	if err != nil {

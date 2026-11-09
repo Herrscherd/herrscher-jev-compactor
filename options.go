@@ -264,11 +264,11 @@ func (o options) stateLadder() inputLadder {
 }
 
 func (o options) stateHead() int {
-	return orDefault(o.stateTextHead, defaultTextHeadRunes)
+	return o.stateTextHead
 }
 
 func (o options) stateTail() int {
-	return orDefault(o.stateTextTail, defaultTextTailRunes)
+	return o.stateTextTail
 }
 
 func (o options) stateContextText() string {
@@ -343,6 +343,15 @@ func settings(texts *messages) []contracts.Setting {
 	}
 }
 
+func refuseIncoherent(read *settingReader, opts options) {
+	if opts.maxStateTokens >= opts.maxRequestTokens {
+		read.refuse(settingMaxStateTokens, strconv.Itoa(opts.maxStateTokens))
+	}
+	if opts.maxRemovedShare > 0 && opts.measureUnit() == unitCharacters && opts.minReduction > opts.maxRemovedShare {
+		read.refuse(settingMinReduction, strconv.FormatFloat(opts.minReduction, 'f', -1, 64))
+	}
+}
+
 func parseOptions(cfg contracts.PluginConfig) (options, error) {
 	apiKey := cfg.Get(settingAPIKey)
 	if apiKey == "" {
@@ -375,8 +384,8 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 		maxPruned:            read.count(settingMaxPruned, defaultMaxPruned, 0),
 		maxRemovedShare:      read.share(settingMaxRemovedShare),
 		stateInputRunes:      read.inputLadder(),
-		stateTextHead:        read.count(settingStateTextHead, 0, 1),
-		stateTextTail:        read.count(settingStateTextTail, 0, 1),
+		stateTextHead:        read.count(settingStateTextHead, defaultTextHeadRunes, 0),
+		stateTextTail:        read.count(settingStateTextTail, defaultTextTailRunes, 0),
 		stateContext:         read.text(settingStateContext, ""),
 		stateStages:          read.stageOrder(),
 		goalSource:           read.goalSource(),
@@ -398,6 +407,7 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 	if opts.retries > maxRetries {
 		read.refuse(settingRetries, strconv.Itoa(opts.retries))
 	}
+	refuseIncoherent(&read, opts)
 	if read.err != nil {
 		return options{}, read.err
 	}

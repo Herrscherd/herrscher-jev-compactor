@@ -43,6 +43,7 @@ func TestStateTextLengthsAreRead(t *testing.T) {
 	}{
 		{settingStateTextHead, "", options.stateHead, defaultTextHeadRunes},
 		{settingStateTextHead, "50", options.stateHead, 50},
+		{settingStateTextHead, "0", options.stateHead, 0},
 		{settingStateTextTail, "", options.stateTail, defaultTextTailRunes},
 		{settingStateTextTail, "20", options.stateTail, 20},
 	}
@@ -99,7 +100,6 @@ func TestStateSettingsRefuseBadValues(t *testing.T) {
 		{settingStateInputRunes, "1000,200"},
 		{settingStateInputRunes, "1000,0,60"},
 		{settingStateInputRunes, "1000,200,lots"},
-		{settingStateTextHead, "0"},
 		{settingStateTextTail, "-3"},
 		{settingStateStages, "abridge_texts,nope"},
 		{settingStateStages, "leave_out,leave_out"},

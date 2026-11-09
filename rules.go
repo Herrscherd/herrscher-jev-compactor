@@ -48,9 +48,10 @@ func (a ruleAction) decision() decision {
 type rule struct {
 	patterns   []string
 	action     ruleAction
+	threshold  optionalRatio
 	callKeep   optionalRatio
 	resultKeep optionalRatio
-	head       int
+	head       optionalCount
 	tail       optionalCount
 }
 
@@ -109,7 +110,7 @@ func (r *rule) apply(token string) bool {
 	switch name {
 	case "threshold":
 		ratio, ok := parseRatio(value)
-		return ok && r.setCallKeep(ratio) && r.setResultKeep(ratio)
+		return ok && r.setThreshold(ratio)
 	case "call_threshold":
 		ratio, ok := parseRatio(value)
 		return ok && r.setCallKeep(ratio)
@@ -118,10 +119,10 @@ func (r *rule) apply(token string) bool {
 		return ok && r.setResultKeep(ratio)
 	case "head":
 		runes, err := strconv.Atoi(value)
-		return err == nil && runes >= 1 && r.setHead(runes)
+		return err == nil && runes >= 0 && setOnce(&r.head, runes)
 	case "tail":
 		runes, err := strconv.Atoi(value)
-		return err == nil && runes >= 0 && r.setTail(runes)
+		return err == nil && runes >= 0 && setOnce(&r.tail, runes)
 	}
 	return false
 }
@@ -131,6 +132,14 @@ func (r *rule) setAction(action ruleAction) bool {
 		return false
 	}
 	r.action = action
+	return true
+}
+
+func (r *rule) setThreshold(ratio float64) bool {
+	if r.threshold.set {
+		return false
+	}
+	r.threshold = optionalRatio{value: ratio, set: true}
 	return true
 }
 
@@ -150,19 +159,11 @@ func (r *rule) setResultKeep(ratio float64) bool {
 	return true
 }
 
-func (r *rule) setHead(runes int) bool {
-	if r.head != 0 {
+func setOnce(slot *optionalCount, value int) bool {
+	if slot.set {
 		return false
 	}
-	r.head = runes
-	return true
-}
-
-func (r *rule) setTail(runes int) bool {
-	if r.tail.set {
-		return false
-	}
-	r.tail = optionalCount{value: runes, set: true}
+	*slot = optionalCount{value: value, set: true}
 	return true
 }
 

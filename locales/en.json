@@ -117,7 +117,7 @@
   {
     "id": "jev.setting.max_pruned",
     "description": "Help of the max_pruned setting",
-    "other": "maximum number of tool calls pruned in one compaction, 0 for no limit"
+    "other": "maximum number of tool calls one compaction edits, pruned or truncated, 0 for no limit"
   },
   {
     "id": "jev.setting.max_removed_share",
@@ -132,12 +132,12 @@
   {
     "id": "jev.setting.state_text_head",
     "description": "Help of the state_text_head setting",
-    "other": "characters kept at the head of a long text of the state when it is abridged"
+    "other": "characters kept at the head of a long text of the state when it is abridged, 0 for none"
   },
   {
     "id": "jev.setting.state_text_tail",
     "description": "Help of the state_text_tail setting",
-    "other": "characters kept at the tail of a long text of the state when it is abridged"
+    "other": "characters kept at the tail of a long text of the state when it is abridged, 0 for none"
   },
   {
     "id": "jev.setting.state_context",
@@ -219,6 +219,11 @@
     "description": "Appended to the note when calls were kept from the incremental cache without asking Jev: Hits is how many",
     "one": "{{.Count}} call kept from the cache, not asked again.",
     "other": "{{.Count}} calls kept from the cache, not asked again."
+  },
+  {
+    "id": "jev.note.state",
+    "description": "Appended to the note with the state Jev was given: Tokens is its size in tokens, Stage the fitting stage that made it fit",
+    "other": "State read by Jev: {{.Tokens}} tokens, fitted by {{.Stage}}."
   },
   {
     "id": "jev.note.failed",

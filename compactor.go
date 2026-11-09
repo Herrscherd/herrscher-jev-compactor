@@ -111,28 +111,37 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 		}
 		return run.finish(contracts.CompactResult{Note: c.noteWith(report, noteNothingToPrune, nil)}, contracts.CompactSkipped), nil
 	}
-	if c.opts.dryRun {
-		run.reduce(report, before, before-report.removed.runes)
-		note := c.noteWith(report, noteDryRun, map[string]any{countParam: len(report.edits)})
-		return run.finish(contracts.CompactResult{Note: note}, contracts.CompactDryRun), nil
-	}
 	if c.opts.revertsShort() {
 		if planned := c.plannedShare(report, history); planned < c.opts.minReduction {
 			return c.reverted(run, report, noteReverted, planned), nil
 		}
 	}
+	if c.opts.dryRun {
+		run.reduce(report, before, before-report.removed.runes)
+		note := c.noteWith(report, noteDryRun, map[string]any{countParam: len(report.edits)})
+		return run.finish(contracts.CompactResult{Note: note}, contracts.CompactDryRun), nil
+	}
 	outcome, err := req.History.PruneHistory(ctx, report.edits)
 	if err != nil {
 		return run.finish(contracts.CompactResult{}, contracts.CompactFailed), &unavailableError{cause: err}
 	}
-	return c.result(run, report, outcome, c.reductionMeasured(report, outcome, history)), nil
+	reduction, err := c.reductionMeasured(ctx, req.History, outcome, history)
+	if err != nil {
+		return run.finish(contracts.CompactResult{}, contracts.CompactFailed), &unavailableError{cause: err}
+	}
+	return c.result(run, report, outcome, reduction), nil
 }
 
-func (c *compactor) reductionMeasured(report planReport, outcome contracts.PruneOutcome, history contracts.History) float64 {
-	if c.opts.measureUnit() == unitEstimated {
-		return c.plannedShare(report, history)
+func (c *compactor) reductionMeasured(ctx context.Context, editor contracts.HistoryEditor, outcome contracts.PruneOutcome, history contracts.History) (float64, error) {
+	if c.opts.measureUnit() != unitEstimated {
+		return reductionOf(outcome, textRunes(history)), nil
 	}
-	return reductionOf(outcome, textRunes(history))
+	after, err := editor.ReadHistory(ctx)
+	if err != nil {
+		return 0, err
+	}
+	unit := c.opts.measureUnit()
+	return shareOf(unit.historySize(history)-unit.historySize(after), unit.historySize(history)), nil
 }
 
 func (c *compactor) reverted(run *compactRun, report planReport, key string, reduction float64) contracts.CompactResult {
@@ -145,6 +154,9 @@ func (c *compactor) noteWith(report planReport, key string, params map[string]an
 	note := c.texts.english(key, params)
 	if report.cached > 0 {
 		note += ". " + c.texts.english(noteCacheHits, map[string]any{countParam: report.cached})
+	}
+	if report.state.tokens > 0 {
+		note += ". " + c.texts.english(noteState, map[string]any{"Tokens": report.state.tokens, "Stage": report.state.stage})
 	}
 	if !report.capped {
 		return note

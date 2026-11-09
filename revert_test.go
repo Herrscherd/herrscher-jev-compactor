@@ -79,3 +79,33 @@ func TestKeepStillAppliesAShortReduction(t *testing.T) {
 		t.Fatalf("Done = true, want the next stage to run after a short reduction")
 	}
 }
+
+func TestTokenReductionIsMeasuredOnTheHistoryAfterThePrune(t *testing.T) {
+	server := &fakeJev{answers: sessionAnswers()}
+	stage := newTestCompactor(t, server, map[string]string{settingReductionUnit: "tokens", settingMinReduction: "0.01"})
+	unchanged := sessionHistory()
+	editor := &fakeHistory{history: sessionHistory(), afterPrune: &unchanged, outcome: contracts.PruneOutcome{Edited: 2, CharsBefore: 1000, CharsAfter: 600}}
+	result, err := stage.Compact(t.Context(), contracts.CompactRequest{History: editor}, nil)
+	if err != nil {
+		t.Fatalf("Compact: %v", err)
+	}
+	if len(editor.pruned) != 1 {
+		t.Fatalf("PruneHistory calls = %d, want 1", len(editor.pruned))
+	}
+	if result.Done || !strings.Contains(result.Note, "is 0% smaller") {
+		t.Fatalf("done = %v, note = %q, want the real token share of 0%% and not done", result.Done, result.Note)
+	}
+}
+
+func TestDryRunReportsTheRevertTheRealRunWouldMake(t *testing.T) {
+	server := &fakeJev{answers: sessionAnswers()}
+	stage := newTestCompactor(t, server, map[string]string{settingDryRun: "true", settingOnShort: "revert", settingMinReduction: "0.6"})
+	editor := &fakeHistory{history: sessionHistory()}
+	result, err := stage.Compact(t.Context(), contracts.CompactRequest{History: editor}, nil)
+	if err != nil {
+		t.Fatalf("Compact: %v", err)
+	}
+	if result.Stats.Outcome != contracts.CompactSkipped || !strings.Contains(result.Note, "left as it was") {
+		t.Fatalf("outcome = %v, note = %q, want the revert reported by the dry run", result.Stats.Outcome, result.Note)
+	}
+}

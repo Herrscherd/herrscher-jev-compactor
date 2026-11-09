@@ -67,6 +67,7 @@ const (
 	noteDryRun               = "jev.note.dry_run"
 	noteSpendCapped          = "jev.note.spend_capped"
 	noteCacheHits            = "jev.note.cache_hits"
+	noteState                = "jev.note.state"
 )
 
 type messages struct {

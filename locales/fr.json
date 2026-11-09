@@ -117,7 +117,7 @@
   {
     "id": "jev.setting.max_pruned",
     "description": "Help of the max_pruned setting",
-    "other": "nombre maximal d'appels d'outil élagués en une compaction, 0 pour sans limite"
+    "other": "nombre maximal d'appels d'outil modifiés en une compaction, élagués ou tronqués, 0 pour sans limite"
   },
   {
     "id": "jev.setting.max_removed_share",
@@ -132,12 +132,12 @@
   {
     "id": "jev.setting.state_text_head",
     "description": "Help of the state_text_head setting",
-    "other": "caractères gardés en tête d'un long texte de l'état quand il est abrégé"
+    "other": "caractères gardés en tête d'un long texte de l'état quand il est abrégé, 0 pour aucun"
   },
   {
     "id": "jev.setting.state_text_tail",
     "description": "Help of the state_text_tail setting",
-    "other": "caractères gardés en queue d'un long texte de l'état quand il est abrégé"
+    "other": "caractères gardés en queue d'un long texte de l'état quand il est abrégé, 0 pour aucun"
   },
   {
     "id": "jev.setting.state_context",
@@ -219,6 +219,11 @@
     "description": "Appended to the note when calls were kept from the incremental cache without asking Jev: Hits is how many",
     "one": "{{.Count}} appel gardé depuis le cache, non réinterrogé.",
     "other": "{{.Count}} appels gardés depuis le cache, non réinterrogés."
+  },
+  {
+    "id": "jev.note.state",
+    "description": "Ajoutée à la note avec l'état donné à Jev : Tokens est sa taille en jetons, Stage l'étape d'ajustement qui l'a fait tenir",
+    "other": "État lu par Jev : {{.Tokens}} jetons, ajusté par {{.Stage}}."
   },
   {
     "id": "jev.note.failed",

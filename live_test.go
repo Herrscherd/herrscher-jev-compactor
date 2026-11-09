@@ -22,6 +22,12 @@ func TestLiveJevAnswersTheSessionHistory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Compact against the live API: %v", err)
 	}
+	if result.Stats == nil || result.Stats.Requests == 0 {
+		t.Fatal("live compaction sent no request to Jev")
+	}
+	if result.Stats.Outcome == contracts.CompactFailed {
+		t.Fatalf("live compaction failed: %q", result.Note)
+	}
 	if result.Note == "" {
 		t.Fatal("live compaction returned no note")
 	}

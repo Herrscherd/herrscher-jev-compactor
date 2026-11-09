@@ -48,14 +48,9 @@ func TestEveryMessageRendersInEveryLanguage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewCatalog: %v", err)
 	}
-	params := map[string]any{"Count": 2, "Kept": 1, "Truncated": 0, "Pruned": 1, "Percent": 30, "Target": 25, "Reason": "x"}
-	keys := []string{
-		helpAccess, helpModel, helpEndpoint, helpKeepThreshold, helpPreserveRecent,
-		helpTruncateHead, helpMinReduction, helpStateBudget, helpRequestBudget,
-		helpTimeout, noteNoHistory, noteNothingToPrune, notePruned, notePrunedShort, noteFailed,
-	}
+	params := map[string]any{"Count": 2, "Kept": 1, "Truncated": 0, "Pruned": 1, "Percent": 30, "Target": 25, "Reason": "x", "Requests": 3, "Tokens": 100, "Stage": "full"}
 	for _, lang := range i18n.Languages() {
-		for _, key := range keys {
+		for _, key := range localeIDs(t, "en.json") {
 			text, err := catalog.Message(lang, key, params)
 			if err != nil || text == key {
 				t.Errorf("%s %s = %q, %v", lang, key, text, err)
@@ -65,25 +60,27 @@ func TestEveryMessageRendersInEveryLanguage(t *testing.T) {
 }
 
 func TestLocalesShareTheirKeys(t *testing.T) {
-	ids := func(name string) []string {
-		raw, err := localeFiles.ReadFile("locales/" + name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var entries []struct {
-			ID string `json:"id"`
-		}
-		if err := json.Unmarshal(raw, &entries); err != nil {
-			t.Fatal(err)
-		}
-		keys := make([]string, 0, len(entries))
-		for _, entry := range entries {
-			keys = append(keys, entry.ID)
-		}
-		slices.Sort(keys)
-		return keys
-	}
-	if english, french := ids("en.json"), ids("fr.json"); !slices.Equal(english, french) {
+	if english, french := localeIDs(t, "en.json"), localeIDs(t, "fr.json"); !slices.Equal(english, french) {
 		t.Fatalf("en %v and fr %v differ", english, french)
 	}
+}
+
+func localeIDs(t *testing.T, name string) []string {
+	t.Helper()
+	raw, err := localeFiles.ReadFile("locales/" + name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var entries []struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(raw, &entries); err != nil {
+		t.Fatal(err)
+	}
+	keys := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		keys = append(keys, entry.ID)
+	}
+	slices.Sort(keys)
+	return keys
 }

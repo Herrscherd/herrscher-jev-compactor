@@ -2,6 +2,7 @@ package jev
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	contracts "github.com/Herrscherd/herrscher-contracts"
@@ -50,7 +51,7 @@ func TestCompactDryRunPlansWithoutPruning(t *testing.T) {
 	if len(editor.pruned) != 0 {
 		t.Fatalf("dry run pruned %+v, want nothing", editor.pruned)
 	}
-	if result.Done || result.Note != "Jev would prune 2 tool calls, dry run: the history is unchanged" {
+	if result.Done || !strings.HasPrefix(result.Note, "Jev would prune 2 tool calls, dry run: the history is unchanged") {
 		t.Fatalf("result = %+v, want the next stage and the dry run note", result)
 	}
 }
@@ -62,7 +63,7 @@ func TestCompactOnShortDoneStopsTheStack(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Compact: %v", err)
 	}
-	if !result.Done || result.Note != "Jev reviewed 5 tool calls: 3 kept, 1 truncated, 1 removed, the history is 9% smaller, short of the 25% aimed for, so the stack stops here" {
+	if !result.Done || !strings.HasPrefix(result.Note, "Jev reviewed 5 tool calls: 3 kept, 1 truncated, 1 removed, the history is 9% smaller, short of the 25% aimed for, so the stack stops here") {
 		t.Fatalf("result = %+v, want the stack to stop", result)
 	}
 }

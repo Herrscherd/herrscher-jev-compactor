@@ -2,6 +2,7 @@ package jev
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -89,4 +90,87 @@ func TestDecisionLogWriteFailureDoesNotFailTheCompaction(t *testing.T) {
 	if !result.Done {
 		t.Fatalf("result = %+v, want the compaction to go on despite the failed writes", result)
 	}
+}
+
+func TestDecisionLogRotatesWhenItGrowsPastTheLimit(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "decisions.jsonl")
+	old := strings.Repeat("x", 100) + "\n"
+	if err := os.WriteFile(path, []byte(old), decisionLogMode); err != nil {
+		t.Fatalf("seed decision log: %v", err)
+	}
+	journal := openDecisionLogWithLimit(path, 50)
+	journal.close()
+	backup, err := os.ReadFile(path + decisionLogBackupSuffix)
+	if err != nil || string(backup) != old {
+		t.Fatalf("backup = %q, %v, want the previous log moved aside", backup, err)
+	}
+	info, err := os.Stat(path)
+	if err != nil || info.Size() != 0 {
+		t.Fatalf("new log = %v, %v, want an empty file at the path", info, err)
+	}
+}
+
+func TestDecisionLogKeepsASmallLogInPlace(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "decisions.jsonl")
+	if err := os.WriteFile(path, []byte("kept\n"), decisionLogMode); err != nil {
+		t.Fatalf("seed decision log: %v", err)
+	}
+	openDecisionLogWithLimit(path, 1<<20).close()
+	if _, err := os.Stat(path + decisionLogBackupSuffix); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("backup stat = %v, want no rotation below the limit", err)
+	}
+}
+
+func TestDecisionLogRestrictsAnExistingFileToItsOwner(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "decisions.jsonl")
+	if err := os.WriteFile(path, nil, 0o644); err != nil {
+		t.Fatalf("seed decision log: %v", err)
+	}
+	openDecisionLog(path).close()
+	info, err := os.Stat(path)
+	if err != nil || info.Mode().Perm() != decisionLogMode {
+		t.Fatalf("mode = %v, %v, want %v", info, err, os.FileMode(decisionLogMode))
+	}
+}
+
+func TestDecisionLogTagsEachEntryWithItsCompaction(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "decisions.jsonl")
+	stage := newTestCompactor(t, &fakeJev{answers: sessionAnswers()}, map[string]string{settingDecisionLog: path})
+	if _, _, err := compactSession(t, stage); err != nil {
+		t.Fatalf("first Compact: %v", err)
+	}
+	first := readDecisionLog(t, path)
+	if _, _, err := compactSession(t, stage); err != nil {
+		t.Fatalf("second Compact: %v", err)
+	}
+	all := readDecisionLog(t, path)
+	firstID, ok := first[0]["compaction"].(string)
+	if !ok || firstID == "" {
+		t.Fatalf("entry %v has no compaction id", first[0])
+	}
+	for _, entry := range first {
+		if entry["compaction"] != firstID {
+			t.Fatalf("entry %v has compaction %v, want %q", entry, entry["compaction"], firstID)
+		}
+	}
+	if second := all[len(first)]["compaction"]; second == firstID {
+		t.Fatalf("second compaction reuses id %q, want one id per compaction", firstID)
+	}
+}
+
+func TestDecisionLogSaysWhyAShortResultIsKept(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "decisions.jsonl")
+	stage := newTestCompactor(t, &fakeJev{answers: sessionAnswers()}, map[string]string{settingDecisionLog: path, settingMinResultChars: "10"})
+	if _, _, err := compactSession(t, stage); err != nil {
+		t.Fatalf("Compact: %v", err)
+	}
+	for _, entry := range readDecisionLog(t, path) {
+		if entry["tool"] == "Bash" && entry["result_size"] == float64(len("a b c")) {
+			if entry["verdict"] != "keep" || entry["reason"] != reasonShort {
+				t.Fatalf("short result entry = %v, want keep for reason %q", entry, reasonShort)
+			}
+			return
+		}
+	}
+	t.Fatal("no decision logged for the short result, want one kept for reason " + reasonShort)
 }

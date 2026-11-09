@@ -17,12 +17,16 @@ import (
 )
 
 type fakeHistory struct {
-	history contracts.History
-	outcome contracts.PruneOutcome
-	pruned  [][]contracts.HistoryEdit
+	history    contracts.History
+	outcome    contracts.PruneOutcome
+	afterPrune *contracts.History
+	pruned     [][]contracts.HistoryEdit
 }
 
 func (f *fakeHistory) ReadHistory(context.Context) (contracts.History, error) {
+	if f.afterPrune != nil && len(f.pruned) > 0 {
+		return *f.afterPrune, nil
+	}
 	return f.history, nil
 }
 
@@ -147,7 +151,7 @@ func TestCompactPrunesWhatJevLetsGoAndStopsTheStack(t *testing.T) {
 	if !result.Done || result.TokensMeasured || result.Notice.Code != contracts.CodeCompacted {
 		t.Fatalf("result = %+v, want done, unmeasured, compacted", result)
 	}
-	if result.Note != "Jev reviewed 5 tool calls: 3 kept, 1 truncated, 1 removed, the history is 38% smaller" {
+	if !strings.HasPrefix(result.Note, "Jev reviewed 5 tool calls: 3 kept, 1 truncated, 1 removed, the history is 38% smaller") {
 		t.Fatalf("note = %q", result.Note)
 	}
 	wantAsked := []string{"call_t1", "call_t2", "call_t3", "call_t4", "result_t1", "result_t2", "result_t3", "result_t4"}
@@ -172,7 +176,7 @@ func TestCompactLetsTheNextStageRunWhenTheReductionFallsShort(t *testing.T) {
 	if result.Done {
 		t.Fatalf("result = %+v, want the stack to go on", result)
 	}
-	if result.Note != "Jev reviewed 5 tool calls: 3 kept, 1 truncated, 1 removed, the history is 9% smaller, short of the 25% aimed for, so the next stage runs" {
+	if !strings.HasPrefix(result.Note, "Jev reviewed 5 tool calls: 3 kept, 1 truncated, 1 removed, the history is 9% smaller, short of the 25% aimed for, so the next stage runs") {
 		t.Fatalf("note = %q", result.Note)
 	}
 }
@@ -347,5 +351,18 @@ func TestCompactSplitsTheQuestionsAcrossRequests(t *testing.T) {
 	}
 	if len(server.requests) < 2 || len(server.askedQuestions()) != 8 {
 		t.Fatalf("%d requests asking %v, want the 8 questions split", len(server.requests), server.askedQuestions())
+	}
+}
+
+func TestNoteSaysWhatStateJevWasGiven(t *testing.T) {
+	server := &fakeJev{answers: sessionAnswers()}
+	stage := newTestCompactor(t, server, nil)
+	editor := &fakeHistory{history: sessionHistory(), outcome: contracts.PruneOutcome{Edited: 2, CharsBefore: 1000, CharsAfter: 600}}
+	result, err := stage.Compact(t.Context(), contracts.CompactRequest{History: editor}, nil)
+	if err != nil {
+		t.Fatalf("Compact: %v", err)
+	}
+	if !strings.Contains(result.Note, "State read by Jev:") || !strings.Contains(result.Note, "fitted by inputs<=") {
+		t.Fatalf("note = %q, want the state tokens and the stage that fitted it", result.Note)
 	}
 }

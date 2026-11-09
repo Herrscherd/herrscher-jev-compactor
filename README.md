@@ -77,6 +77,10 @@ setting.
      longer than those by more than 120;
    - neither: prune the call (`PruneCall`), which keeps the call in place with
      its input shortened and its output replaced by a note.
+
+The note Jev returns ends with the state it was given: its size in tokens and
+the reduction stage that made it fit, so an operator can see when the state
+had to be cut.
 6. Apply every edit in one `PruneHistory` call.
 7. Report `Done` when the history shrank by at least `min_reduction`, so the
    backend's own compaction runs only when pruning was not enough. The share
@@ -85,38 +89,41 @@ setting.
 
 `reduction_unit` sets the unit the share is measured in. With `characters`, the
 default, the share counts the characters of the tool inputs and outputs, and
-the message text, as above. With `tokens`, it counts the tokens estimated as
-described below, of the same parts, and the reduction is the plan's estimate
-(the tokens it removes over the tokens of the history): `PruneOutcome` only
-reports characters, so the share cannot come from the backend in that unit.
-`max_removed_share` stays in characters.
+the message text, as above, and comes from the backend's `PruneOutcome`. With
+`tokens`, it counts the tokens estimated as described below, of the same parts,
+on the history read again after the edits. `max_removed_share` stays in
+characters.
 
 When `on_short` is `revert`, a pruning that falls short is not applied at all.
 Before Jev is asked, the stage takes the most pruning could remove, every
 unpinned call with its input and output, and if that stays under
 `min_reduction` it does not ask Jev and leaves the history as it was. After Jev
-answers, it measures the share the plan removes, the text it takes out, and
-calls `PruneHistory` only when that share reaches the target. The plan measure
-is an estimate: the backend writes a note in place of each pruned output and
-shortens the inputs, so the real share can differ slightly from it. When the
+answers, it measures the share the plan removes, net of the note the backend
+writes in place of each pruned output, and calls `PruneHistory` only when that
+share reaches the target. The plan does not model the shortening of the inputs
+of pruned calls, so the real share is at least the plan's, never less. When the
 edits are applied and still fall short, they stay applied and the note reports
-the short reduction, as `keep` does.
+the short reduction, as `keep` does. `on_short` is read the same way in a dry
+run, which then reports the revert instead of the projection.
 
 ### Rules, pins and budgets
 
 `pin_inputs` keeps, without asking Jev, every call whose input contains one of
-its substrings, and every output shorter than `min_result_chars`. The newest
-messages and the first message stay pinned as before.
+its substrings. `min_result_chars` keeps, the same way, every call whose output
+is shorter than that many characters. The newest messages and the first message
+stay pinned as before.
 
 `rules` sets what happens to the calls of a given tool, without asking Jev for
 them. A rule is `motif[,motif]:action[,action]`, rules are separated by `;`,
 and the first rule whose motif matches the tool name wins. A motif is a
 `path.Match` glob such as `Read*`. The actions are `keep` (the call stays
 untouched), `prune` (the call is pruned, as `PruneCall`) and `truncate` (the
-output keeps its first `head` and last `tail` characters, as `PruneResult`). A
-rule with no action leaves
-the decision to Jev, judged against the thresholds it sets with `threshold=`,
-`call_threshold=` and `result_threshold=`, and against its `head` and `tail`.
+output keeps its first `head` and last `tail` characters, as `PruneResult`).
+`head=0` keeps none of the output's head. A rule with no action leaves the
+decision to Jev, judged against the thresholds it sets: `threshold=` sets both
+channels, `call_threshold=` and `result_threshold=` set one each and win over
+`threshold=` whatever the order, and each is given at most once. A rule
+also takes its `head` and `tail`.
 For example:
 
 ```bash
@@ -127,9 +134,10 @@ A call decided by a rule with an action is never asked about, and when a budget
 is exceeded such a decision is the last to be given back.
 
 `max_pruned` and `max_removed_share` cap one compaction. When the plan would
-prune more calls than `max_pruned`, or remove more than `max_removed_share` of
-the history, the pruning decisions carrying the highest keep probability (the
-ones Jev is least sure of) are demoted to keep first, until the plan fits.
+edit more calls than `max_pruned`, or remove more than `max_removed_share` of
+the history, the decisions carrying the highest keep probability (the ones Jev
+is least sure of) are demoted to keep first, until the plan fits. `max_pruned`
+counts every edited call, truncated outputs included, not only the pruned ones.
 Decisions taken by a rule are demoted last.
 
 The goal Jev weighs each call against is the operator's instruction
@@ -147,9 +155,9 @@ history cannot be read or pruned, or when its context is cancelled.
 
 A `429` or a `5xx` answer is sent again up to `retries` times, after a wait of
 `retry_backoff` doubled at each retry, or of the `Retry-After` the answer gives
-when that is longer (in seconds or as an HTTP date). Waits are capped at 30s:
-a `Retry-After` over 30s is not waited for, the failure stands and the stage
-steps aside as above. Other `4xx` answers, network errors and timeouts are
+when that is longer (in seconds or as an HTTP date). A wait is never longer
+than 30s: a `Retry-After` over 30s stops the retries, nothing waits for it, the
+failure stands and the stage steps aside as above. Other `4xx` answers, network errors and timeouts are
 never retried, and a wait ends with the context of the compaction.
 
 `max_requests` and `max_sent_tokens` cap what one compaction sends to Jev, retries
@@ -200,28 +208,28 @@ note says how many, as in `2 calls kept from the cache, not asked again.`
 | `keep_errors` | `JEV_KEEP_ERRORS` | `false` | `true` keeps the output of a failed call, so a pruned call keeps its error |
 | `include_empty_results` | `JEV_INCLUDE_EMPTY_RESULTS` | `false` | `true` also judges calls whose result is empty, which can include calls still running |
 | `min_result_chars` | `JEV_MIN_RESULT_CHARS` | `0` | outputs shorter than this many characters always stay |
-| `max_pruned` | `JEV_MAX_PRUNED` | `0` | most tool calls one compaction prunes, `0` for no limit |
-| `max_removed_share` | `JEV_MAX_REMOVED_SHARE` | `1` | most of the history, 0 to 1, one compaction may remove, `1` for no limit |
+| `max_pruned` | `JEV_MAX_PRUNED` | `0` | most tool calls one compaction edits, pruned or truncated, `0` for no limit |
+| `max_removed_share` | `JEV_MAX_REMOVED_SHARE` | `1` | most of the history, above 0 up to 1, one compaction may remove, `1` for no limit; refused when `min_reduction` is above it with `reduction_unit` `characters` |
 | `preserve_recent` | `JEV_PRESERVE_RECENT` | `6` | newest messages whose calls are pinned |
-| `truncate_head` | `JEV_TRUNCATE_HEAD` | `300` | characters kept from an output Jev lets go |
+| `truncate_head` | `JEV_TRUNCATE_HEAD` | `300` | characters kept from an output Jev lets go, `0` for none |
 | `truncate_tail` | `JEV_TRUNCATE_TAIL` | `0` | characters kept from the end of an output Jev lets go |
 | `min_reduction` | `JEV_MIN_REDUCTION` | `0.25` | share of the history, 0 to 1, that stops the stack |
 | `reduction_unit` | `JEV_REDUCTION_UNIT` | `characters` | unit `min_reduction` is measured in: `characters`, or `tokens` estimated as below |
-| `max_state_tokens` | `JEV_MAX_STATE_TOKENS` | `25000` | token budget of the state |
+| `max_state_tokens` | `JEV_MAX_STATE_TOKENS` | `25000` | token budget of the state, below `max_request_tokens` |
 | `max_request_tokens` | `JEV_MAX_REQUEST_TOKENS` | `30000` | token budget of one request |
 | `timeout` | `JEV_TIMEOUT` | `2m0s` | timeout of one request, as a Go duration |
 | `retries` | `JEV_RETRIES` | `0` | times a request is sent again after a 429 or a 5xx answer, at most 10, `0` for none |
 | `retry_backoff` | `JEV_RETRY_BACKOFF` | `1s` | first wait before a retry, as a Go duration, doubled at each retry and capped at 30s |
 | `max_requests` | `JEV_MAX_REQUESTS` | `0` | most requests sent to Jev for one compaction, retries included, `0` for no cap |
 | `max_sent_tokens` | `JEV_MAX_SENT_TOKENS` | `0` | most tokens sent to Jev for one compaction, retries included and estimated, `0` for no cap |
-| `decision_log` | `JEV_DECISION_LOG` | empty | JSONL file where each decision on a tool call is appended, empty for none |
-| `incremental` | `JEV_INCREMENTAL` | `false` | `true` does not ask Jev again about the calls it already said to keep in an earlier compaction of the same session, while their content and the goal stay the same |
+| `decision_log` | `JEV_DECISION_LOG` | empty | JSONL file where each decision on a tool call is appended, with a `compaction` id per compaction; created or restricted to mode 0600, moved to `<file>.1` (replacing the previous backup) once it reaches 10 MiB; empty for none |
+| `incremental` | `JEV_INCREMENTAL` | `false` | `true` does not ask Jev again about the calls it already said to keep in an earlier compaction of the same session, while their content and the goal stay the same; the cache holds 4096 calls and is emptied when a new call arrives while it is full |
 | `max_parallel` | `JEV_MAX_PARALLEL` | `4` | requests sent to Jev at once, at least 1 |
 | `on_short` | `JEV_ON_SHORT` | `keep` | `keep` leaves a short reduction to the next stage, `done` stops the stack there, `revert` leaves the history as it was when the reduction is short |
 | `dry_run` | `JEV_DRY_RUN` | `false` | `true` computes what Jev would prune and changes nothing |
 | `state_input_runes` | `JEV_STATE_INPUT_RUNES` | `1000,200,60` | three cut levels of tool inputs in the state, longest first: full, short, line |
-| `state_text_head` | `JEV_STATE_TEXT_HEAD` | `400` | characters kept at the head of a long text when the state abridges it |
-| `state_text_tail` | `JEV_STATE_TEXT_TAIL` | `150` | characters kept at the tail of a long text when the state abridges it |
+| `state_text_head` | `JEV_STATE_TEXT_HEAD` | `400` | characters kept at the head of a long text when the state abridges it, `0` for none |
+| `state_text_tail` | `JEV_STATE_TEXT_TAIL` | `150` | characters kept at the tail of a long text when the state abridges it, `0` for none |
 | `state_context` | `JEV_STATE_CONTEXT` | built-in text | context text Jev reads, replacing the built-in one when set |
 | `state_stages` | `JEV_STATE_STAGES` | all, in order | ordered reduction stages allowed among `abridge_texts`, `collapse_messages`, `compact_calls`, `leave_out`, `merge_calls` |
 | `goal_source` | `JEV_GOAL_SOURCE` | `auto` | `auto` takes the instruction, then the last user prompts; `prompts` always takes the last user prompts; `fixed` always takes `goal_text` |

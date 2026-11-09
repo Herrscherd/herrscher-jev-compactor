@@ -16,6 +16,8 @@ const (
 	questionType          = "noul"
 	callQuestionPrefix    = "call_"
 	resultQuestionPrefix  = "result_"
+	prunedResultNote      = "[herrscher pruned the rest of this result: %d characters]"
+	prunedCallNote        = "[herrscher pruned the result of this call]"
 )
 
 // ErrNoRoomForQuestions is returned when the state Jev reads leaves no room in a
@@ -53,6 +55,7 @@ const (
 	reasonError     = "error"
 	reasonSpendCap  = "spend_cap"
 	reasonCache     = "cache"
+	reasonShort     = "short"
 )
 
 func (d decision) String() string {
@@ -131,7 +134,7 @@ type truncation struct {
 }
 
 func (o options) truncationFor(picked rule) truncation {
-	return truncation{head: orDefault(picked.head, o.truncateHead), tail: picked.tail.or(o.truncateTail)}
+	return truncation{head: picked.head.or(o.truncateHead), tail: picked.tail.or(o.truncateTail)}
 }
 
 func editFor(call toolCall, verdict decision, cut truncation) (contracts.HistoryEdit, bool) {
@@ -165,8 +168,24 @@ func removedText(call toolCall, edit contracts.HistoryEdit) string {
 	return ""
 }
 
-func removedRunes(call toolCall, edit contracts.HistoryEdit) int {
-	return runeCount(removedText(call, edit))
+func insertedText(call toolCall, edit contracts.HistoryEdit, span string) string {
+	if edit.Action == contracts.PruneCall {
+		return prunedCallNote
+	}
+	note := fmt.Sprintf(prunedResultNote, runeCount(span))
+	if runePrefix(call.source.Result, edit.KeepChars) == "" {
+		return note
+	}
+	return "\n" + note
+}
+
+func removalOf(call toolCall, edit contracts.HistoryEdit) removal {
+	span := removedText(call, edit)
+	inserted := insertedText(call, edit, span)
+	return removal{
+		runes:  max(0, runeCount(span)-runeCount(inserted)),
+		tokens: max(0, estimateTokens(span)-estimateTokens(inserted)),
+	}
 }
 
 type removal struct {
@@ -181,9 +200,9 @@ func removedTotals(calls []toolCall, edits []contracts.HistoryEdit) removal {
 		byID[call.source.ID] = call
 	}
 	for _, edit := range edits {
-		text := removedText(byID[edit.CallID], edit)
-		total.runes += runeCount(text)
-		total.tokens += estimateTokens(text)
+		net := removalOf(byID[edit.CallID], edit)
+		total.runes += net.runes
+		total.tokens += net.tokens
 	}
 	return total
 }
@@ -204,8 +223,8 @@ func historyRunes(history contracts.History) int {
 
 func (o options) thresholdsFor(picked rule) thresholds {
 	return thresholds{
-		call:   picked.callKeep.or(o.callKeepThreshold()),
-		result: picked.resultKeep.or(o.resultKeepThreshold()),
+		call:   picked.callKeep.or(picked.threshold.or(o.callKeepThreshold())),
+		result: picked.resultKeep.or(picked.threshold.or(o.resultKeepThreshold())),
 	}
 }
 
@@ -219,6 +238,12 @@ type planReport struct {
 	outOfReach bool
 	capped     bool
 	cached     int
+	state      stateReport
+}
+
+type stateReport struct {
+	tokens int
+	stage  string
 }
 
 func (c *compactor) plan(ctx context.Context, history contracts.History, req contracts.CompactRequest, journal *decisionLog) (planReport, error) {
@@ -238,9 +263,10 @@ func (c *compactor) plan(ctx context.Context, history contracts.History, req con
 	report.cached = len(unknown) - len(asked)
 	if len(asked) > 0 {
 		spend := newSpendLedger(c.opts.maxRequests, c.opts.maxSentTokens)
-		answers, err := c.judge(ctx, history, calls, asked, goal, spend)
+		answers, fitted, err := c.judge(ctx, history, calls, asked, goal, spend)
 		report.sent = spend.total()
 		report.capped = spend.capped()
+		report.state = stateReport{tokens: fitted.tokens, stage: fitted.stage}
 		if err != nil {
 			return report, err
 		}
@@ -282,9 +308,7 @@ func (c *compactor) decideLocally(calls []toolCall, journal *decisionLog) (map[s
 	var asked []toolCall
 	for _, call := range calls {
 		if c.kept(call) {
-			if c.isPinned(call) {
-				logDecision(journal, call, decisionKeep, reasonPinned)
-			}
+			logDecision(journal, call, decisionKeep, c.keptReason(call))
 			continue
 		}
 		picked := c.opts.policy.ruleFor(call.source.Tool)
@@ -338,21 +362,29 @@ func (c *compactor) isPinned(call toolCall) bool {
 	return call.pinned || c.opts.policy.pinned(call.source.Input)
 }
 
+func (c *compactor) keptReason(call toolCall) string {
+	if c.isPinned(call) {
+		return reasonPinned
+	}
+	return reasonShort
+}
+
 func (c *compactor) kept(call toolCall) bool {
 	return c.isPinned(call) || call.resultRunes() < c.opts.minResultChars
 }
 
-func (c *compactor) judge(ctx context.Context, history contracts.History, calls, asked []toolCall, goal string, spend *spendLedger) (map[string]callAnswer, error) {
+func (c *compactor) judge(ctx context.Context, history contracts.History, calls, asked []toolCall, goal string, spend *spendLedger) (map[string]callAnswer, fittedState, error) {
 	fitted, err := fitState(history, calls, goal, c.opts)
 	if err != nil {
-		return nil, err
+		return nil, fittedState{}, err
 	}
 	slog.Debug("jev: state fitted", "stage", fitted.stage, "tokens", fitted.tokens)
 	batches, err := batchCalls(asked, fitted.tokens, c.opts.maxRequestTokens)
 	if err != nil {
-		return nil, err
+		return nil, fitted, err
 	}
-	return c.askAll(ctx, fitted.state, batches, spend)
+	answers, err := c.askAll(ctx, fitted.state, batches, spend)
+	return answers, fitted, err
 }
 
 func (c *compactor) keepErrorsVerdict(call toolCall, verdict decision) (decision, bool) {
@@ -367,7 +399,7 @@ func (c *compactor) verdictEdit(call toolCall, verdict decision, cut truncation,
 	if !prune {
 		return plannedEdit{}, false
 	}
-	return plannedEdit{edit: edit, keep: keep, removed: removedRunes(call, edit)}, true
+	return plannedEdit{edit: edit, keep: keep, removed: removalOf(call, edit).runes}, true
 }
 
 func (c *compactor) withinBudget(history contracts.History, calls []toolCall, decided map[string]plannedEdit, journal *decisionLog) []contracts.HistoryEdit {
