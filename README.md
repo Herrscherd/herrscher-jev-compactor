@@ -148,6 +148,11 @@ history cannot be read or pruned, or when its context is cancelled.
 | `max_parallel` | `JEV_MAX_PARALLEL` | `4` | requests sent to Jev at once, at least 1 |
 | `on_short` | `JEV_ON_SHORT` | `keep` | `keep` leaves a short reduction to the next stage, `done` stops the stack there |
 | `dry_run` | `JEV_DRY_RUN` | `false` | `true` computes what Jev would prune and changes nothing |
+| `state_input_runes` | `JEV_STATE_INPUT_RUNES` | `1000,200,60` | three cut levels of tool inputs in the state, longest first: full, short, line |
+| `state_text_head` | `JEV_STATE_TEXT_HEAD` | `400` | characters kept at the head of a long text when the state abridges it |
+| `state_text_tail` | `JEV_STATE_TEXT_TAIL` | `150` | characters kept at the tail of a long text when the state abridges it |
+| `state_context` | `JEV_STATE_CONTEXT` | built-in text | context text Jev reads, replacing the built-in one when set |
+| `state_stages` | `JEV_STATE_STAGES` | all, in order | ordered reduction stages allowed among `abridge_texts`, `collapse_messages`, `compact_calls`, `leave_out`, `merge_calls` |
 
 Tokens are estimated without a tokenizer, with the weights fast-jev calibrated
 against what Jev reports: a word costs one token per six letters, a digit half

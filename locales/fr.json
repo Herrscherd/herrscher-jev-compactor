@@ -105,6 +105,31 @@
     "other": "part maximale de 0 à 1 de l'historique qu'une compaction peut retirer, 1 pour sans limite"
   },
   {
+    "id": "jev.setting.state_input_runes",
+    "description": "Help of the state_input_runes setting: the three input cut levels of the state, full, short and line",
+    "other": "trois paliers de coupe des entrées d'appel dans l'état envoyé à Jev, en caractères, du plus long au plus court : complet, court, ligne, séparés par des virgules"
+  },
+  {
+    "id": "jev.setting.state_text_head",
+    "description": "Help of the state_text_head setting",
+    "other": "caractères gardés en tête d'un long texte de l'état quand il est abrégé"
+  },
+  {
+    "id": "jev.setting.state_text_tail",
+    "description": "Help of the state_text_tail setting",
+    "other": "caractères gardés en queue d'un long texte de l'état quand il est abrégé"
+  },
+  {
+    "id": "jev.setting.state_context",
+    "description": "Help of the state_context setting: the context text Jev reads, replacing the built-in one when set",
+    "other": "texte de contexte lu par Jev, qui remplace le texte intégré quand il est renseigné"
+  },
+  {
+    "id": "jev.setting.state_stages",
+    "description": "Help of the state_stages setting: the ordered list of the state reduction stages allowed",
+    "other": "liste ordonnée des étapes de réduction de l'état autorisées, parmi abridge_texts, collapse_messages, compact_calls, leave_out, merge_calls"
+  },
+  {
     "id": "jev.note.failed",
     "description": "The Jev stage failed for Reason, pruned nothing and lets the next stage of the stack compact",
     "other": "Jev n'a rien élagué, l'étape suivante compacte : {{.Reason}}"

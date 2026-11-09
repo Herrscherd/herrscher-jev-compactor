@@ -105,6 +105,31 @@
     "other": "maximum share from 0 to 1 of the history one compaction may remove, 1 for no limit"
   },
   {
+    "id": "jev.setting.state_input_runes",
+    "description": "Help of the state_input_runes setting: the three input cut levels of the state, full, short and line",
+    "other": "three levels of cut for tool inputs in the state Jev reads, in characters, longest first: full, short, line, separated by commas"
+  },
+  {
+    "id": "jev.setting.state_text_head",
+    "description": "Help of the state_text_head setting",
+    "other": "characters kept at the head of a long text of the state when it is abridged"
+  },
+  {
+    "id": "jev.setting.state_text_tail",
+    "description": "Help of the state_text_tail setting",
+    "other": "characters kept at the tail of a long text of the state when it is abridged"
+  },
+  {
+    "id": "jev.setting.state_context",
+    "description": "Help of the state_context setting: the context text Jev reads, replacing the built-in one when set",
+    "other": "context text Jev reads, replacing the built-in one when set"
+  },
+  {
+    "id": "jev.setting.state_stages",
+    "description": "Help of the state_stages setting: the ordered list of the state reduction stages allowed",
+    "other": "ordered list of the state reduction stages allowed, among abridge_texts, collapse_messages, compact_calls, leave_out, merge_calls"
+  },
+  {
     "id": "jev.note.failed",
     "description": "The Jev stage failed for Reason, pruned nothing and lets the next stage of the stack compact",
     "other": "Jev pruned nothing, the next stage compacts: {{.Reason}}"

@@ -33,6 +33,11 @@ const (
 	settingMinResultChars      = "min_result_chars"
 	settingMaxPruned           = "max_pruned"
 	settingMaxRemovedShare     = "max_removed_share"
+	settingStateInputRunes     = "state_input_runes"
+	settingStateTextHead       = "state_text_head"
+	settingStateTextTail       = "state_text_tail"
+	settingStateContext        = "state_context"
+	settingStateStages         = "state_stages"
 )
 
 const (
@@ -51,6 +56,11 @@ const (
 	defaultKeepErrors       = false
 	defaultMinResultChars   = 0
 	defaultMaxPruned        = 0
+	defaultFullInputRunes   = 1000
+	defaultShortInputRunes  = 200
+	defaultLineInputRunes   = 60
+	defaultTextHeadRunes    = 400
+	defaultTextTailRunes    = 150
 )
 
 type onShort uint8
@@ -149,6 +159,11 @@ type options struct {
 	minResultChars   int
 	maxPruned        int
 	maxRemovedShare  float64
+	stateInputRunes  inputLadder
+	stateTextHead    int
+	stateTextTail    int
+	stateContext     string
+	stateStages      stageOrder
 }
 
 func (o options) parallelism() int {
@@ -169,6 +184,26 @@ func (o options) resultKeepThreshold() float64 {
 
 func (o options) budget() budget {
 	return budget{maxPruned: o.maxPruned, maxRemovedShare: o.maxRemovedShare}
+}
+
+func (o options) stateLadder() inputLadder {
+	return orDefault(o.stateInputRunes, defaultInputLadder())
+}
+
+func (o options) stateHead() int {
+	return orDefault(o.stateTextHead, defaultTextHeadRunes)
+}
+
+func (o options) stateTail() int {
+	return orDefault(o.stateTextTail, defaultTextTailRunes)
+}
+
+func (o options) stateContextText() string {
+	return orDefault(o.stateContext, defaultStateContext)
+}
+
+func (o options) stateStageKinds() []stageKind {
+	return orDefault(o.stateStages, defaultStageOrder()).kinds()
 }
 
 func orDefault[T comparable](value, fallback T) T {
@@ -202,6 +237,11 @@ func settings(texts *messages) []contracts.Setting {
 		{Key: settingMinResultChars, Env: "JEV_MIN_RESULT_CHARS", Help: texts.english(helpMinResultChars, nil), Default: strconv.Itoa(defaultMinResultChars)},
 		{Key: settingMaxPruned, Env: "JEV_MAX_PRUNED", Help: texts.english(helpMaxPruned, nil), Default: strconv.Itoa(defaultMaxPruned)},
 		{Key: settingMaxRemovedShare, Env: "JEV_MAX_REMOVED_SHARE", Help: texts.english(helpMaxRemovedShare, nil), Default: strconv.FormatFloat(fullShare, 'g', -1, 64)},
+		{Key: settingStateInputRunes, Env: "JEV_STATE_INPUT_RUNES", Help: texts.english(helpStateInputRunes, nil), Default: defaultInputLadder().String()},
+		{Key: settingStateTextHead, Env: "JEV_STATE_TEXT_HEAD", Help: texts.english(helpStateTextHead, nil), Default: strconv.Itoa(defaultTextHeadRunes)},
+		{Key: settingStateTextTail, Env: "JEV_STATE_TEXT_TAIL", Help: texts.english(helpStateTextTail, nil), Default: strconv.Itoa(defaultTextTailRunes)},
+		{Key: settingStateContext, Env: "JEV_STATE_CONTEXT", Help: texts.english(helpStateContext, nil)},
+		{Key: settingStateStages, Env: "JEV_STATE_STAGES", Help: texts.english(helpStateStages, nil), Default: defaultStageOrder().String()},
 	}
 }
 
@@ -232,6 +272,11 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 		minResultChars:   read.count(settingMinResultChars, defaultMinResultChars, 0),
 		maxPruned:        read.count(settingMaxPruned, defaultMaxPruned, 0),
 		maxRemovedShare:  read.share(settingMaxRemovedShare),
+		stateInputRunes:  read.inputLadder(),
+		stateTextHead:    read.count(settingStateTextHead, 0, 1),
+		stateTextTail:    read.count(settingStateTextTail, 0, 1),
+		stateContext:     read.text(settingStateContext, ""),
+		stateStages:      read.stageOrder(),
 	}
 	if read.err != nil {
 		return options{}, read.err
@@ -338,6 +383,32 @@ func (r *settingReader) onShort() onShort {
 	if !valid {
 		r.refuse(settingOnShort, value)
 		return 0
+	}
+	return parsed
+}
+
+func (r *settingReader) inputLadder() inputLadder {
+	value, ok := r.raw(settingStateInputRunes)
+	if !ok {
+		return inputLadder{}
+	}
+	parsed, valid := parseInputLadder(value)
+	if !valid {
+		r.refuse(settingStateInputRunes, value)
+		return inputLadder{}
+	}
+	return parsed
+}
+
+func (r *settingReader) stageOrder() stageOrder {
+	value, ok := r.raw(settingStateStages)
+	if !ok {
+		return stageOrder{}
+	}
+	parsed, valid := parseStageOrder(value)
+	if !valid {
+		r.refuse(settingStateStages, value)
+		return stageOrder{}
 	}
 	return parsed
 }

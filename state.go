@@ -10,15 +10,7 @@ import (
 	contracts "github.com/Herrscherd/herrscher-contracts"
 )
 
-const stateContext = "A coding assistant conversation is being compacted to free context. `history` is the whole conversation so far, oldest first; tool outputs are replaced by a short `result` note and long texts may be abridged. Each question asks whether one tool call, or the full output of that call, still needs to stay in the history verbatim. Whatever is not kept is deleted permanently, but the assistant can always re-run a tool or re-read a file."
-
-const (
-	fullInputRunes  = 1000
-	shortInputRunes = 200
-	lineInputRunes  = 60
-	textHeadRunes   = 400
-	textTailRunes   = 150
-)
+const defaultStateContext = "A coding assistant conversation is being compacted to free context. `history` is the whole conversation so far, oldest first; tool outputs are replaced by a short `result` note and long texts may be abridged. Each question asks whether one tool call, or the full output of that call, still needs to stay in the history verbatim. Whatever is not kept is deleted permanently, but the assistant can always re-run a tool or re-read a file."
 
 // ErrHistoryTooLarge is returned when the history cannot be shrunk into the token
 // budget of the state Jev reads. Match it with errors.Is.
@@ -56,8 +48,13 @@ type stateFitter struct {
 	calls          []toolCall
 	byMessage      map[int][]toolCall
 	goal           string
+	context        string
 	preserveRecent int
 	maxTokens      int
+	ladder         inputLadder
+	stages         []stageKind
+	head           int
+	tail           int
 	baseTokens     int
 	history        []historyEntry
 	perEntry       []int
@@ -70,10 +67,15 @@ func fitState(history contracts.History, calls []toolCall, goal string, opts opt
 		calls:          calls,
 		byMessage:      callsByMessage(calls),
 		goal:           goal,
+		context:        opts.stateContextText(),
 		preserveRecent: opts.preserveRecent,
 		maxTokens:      opts.maxStateTokens,
+		ladder:         opts.stateLadder(),
+		stages:         opts.stateStageKinds(),
+		head:           opts.stateHead(),
+		tail:           opts.stateTail(),
 	}
-	base, err := fitter.measure(compactionState{Context: stateContext, Goal: goal, History: []historyEntry{}})
+	base, err := fitter.measure(compactionState{Context: fitter.context, Goal: goal, History: []historyEntry{}})
 	if err != nil {
 		return fittedState{}, err
 	}
@@ -106,7 +108,7 @@ func (f *stateFitter) fits() bool { return f.tokens <= f.maxTokens }
 
 func (f *stateFitter) fitted(stage string) fittedState {
 	return fittedState{
-		state:  compactionState{Context: stateContext, Goal: f.goal, History: f.history},
+		state:  compactionState{Context: f.context, Goal: f.goal, History: f.history},
 		tokens: f.tokens,
 		stage:  stage,
 	}
@@ -117,7 +119,7 @@ func (f *stateFitter) pinned(entry *historyEntry) bool {
 }
 
 func (f *stateFitter) fit() (fittedState, error) {
-	for _, limit := range []int{fullInputRunes, shortInputRunes, lineInputRunes} {
+	for _, limit := range f.ladder.levels() {
 		if err := f.rebuild(f.entries(limit)); err != nil {
 			return fittedState{}, err
 		}
@@ -125,33 +127,32 @@ func (f *stateFitter) fit() (fittedState, error) {
 			return f.fitted("inputs<=" + strconv.Itoa(limit)), nil
 		}
 	}
-	order := f.order()
-	for _, stage := range []struct {
-		name   string
-		shrink func(*historyEntry) bool
-	}{
-		{"texts abridged", f.abridgeText},
-		{"old messages collapsed", f.collapseText},
-		{"old calls compacted", f.compactCalls},
-	} {
-		fitted, err := f.shrinkEach(order, stage.shrink)
+	for _, kind := range f.stages {
+		done, err := f.apply(kind)
 		if err != nil {
 			return fittedState{}, err
 		}
-		if fitted {
-			return f.fitted(stage.name), nil
+		if done {
+			return f.fitted(kind.label()), nil
 		}
 	}
-	if f.leaveOut(order) {
-		return f.fitted("old messages left out"), nil
-	}
-	if err := f.rebuild(f.mergeCallRuns()); err != nil {
-		return fittedState{}, err
-	}
-	if f.fits() {
-		return f.fitted("old calls merged"), nil
-	}
 	return fittedState{}, fmt.Errorf("%w: about %d tokens after shrinking, limit %d", ErrHistoryTooLarge, f.tokens, f.maxTokens)
+}
+
+func (f *stateFitter) apply(kind stageKind) (bool, error) {
+	switch kind {
+	case stageAbridge:
+		return f.shrinkEach(f.order(), f.abridgeText)
+	case stageCollapse:
+		return f.shrinkEach(f.order(), f.collapseText)
+	case stageCompactCalls:
+		return f.shrinkEach(f.order(), f.compactCalls)
+	case stageLeaveOut:
+		return f.leaveOut(f.order())
+	case stageMerge:
+		return f.merge()
+	}
+	return false, nil
 }
 
 func (f *stateFitter) entries(inputRunes int) []historyEntry {
@@ -222,11 +223,11 @@ func (f *stateFitter) shrinkEach(order []int, shrink func(*historyEntry) bool) (
 	return false, nil
 }
 
-func (*stateFitter) abridgeText(entry *historyEntry) bool {
-	if runeCount(entry.Text) <= textHeadRunes+textTailRunes+abridgeSlack {
+func (f *stateFitter) abridgeText(entry *historyEntry) bool {
+	if runeCount(entry.Text) <= f.head+f.tail+abridgeSlack {
 		return false
 	}
-	entry.Text = abridge(entry.Text, textHeadRunes, textTailRunes)
+	entry.Text = abridge(entry.Text, f.head, f.tail)
 	return true
 }
 
@@ -245,14 +246,14 @@ func (f *stateFitter) compactCalls(entry *historyEntry) bool {
 	}
 	lines := make([]any, 0, len(own))
 	for _, call := range own {
-		lines = append(lines, compactCallLine(call, lineInputRunes))
+		lines = append(lines, compactCallLine(call, f.ladder.line))
 	}
 	entry.ToolCalls = lines
 	entry.callLines = true
 	return true
 }
 
-func (f *stateFitter) leaveOut(order []int) bool {
+func (f *stateFitter) leaveOut(order []int) (bool, error) {
 	left := make(map[int]bool)
 	for _, index := range order {
 		entry := &f.history[index]
@@ -271,8 +272,17 @@ func (f *stateFitter) leaveOut(order []int) bool {
 			kept = append(kept, f.history[index])
 		}
 	}
-	f.history = kept
-	return f.fits()
+	if err := f.rebuild(kept); err != nil {
+		return false, err
+	}
+	return f.fits(), nil
+}
+
+func (f *stateFitter) merge() (bool, error) {
+	if err := f.rebuild(f.mergeCallRuns()); err != nil {
+		return false, err
+	}
+	return f.fits(), nil
 }
 
 func (f *stateFitter) foldable(entry *historyEntry) bool {
