@@ -174,6 +174,17 @@ answered with nothing. `include_empty_results=true` judges those calls too, so a
 call still running can be pruned or truncated before it returns. Keep it off unless
 the calls with an empty result are the ones to reduce.
 
+`incremental=true` keeps a cache of the calls Jev judged to keep, so a later
+compaction of the same session does not send them again. The cache is scoped to
+the session name and incarnation, and each entry is keyed by the call ID and a
+digest of the goal, the tool, the input, the result and the status. A call whose
+content changes, or a compaction whose goal changes, is judged again. Only the
+verdicts to keep are stored: a call Jev wants to prune is asked about again on
+every compaction. The cache lives in memory of the plugin
+process, is bounded to 4096 calls, and is emptied when it would grow past that
+bound. Nothing is written to disk. When calls are answered from the cache, the
+note says how many, as in `2 calls kept from the cache, not asked again.`
+
 ## Settings
 
 | Key | Env | Default | Meaning |
@@ -204,6 +215,7 @@ the calls with an empty result are the ones to reduce.
 | `max_requests` | `JEV_MAX_REQUESTS` | `0` | most requests sent to Jev for one compaction, retries included, `0` for no cap |
 | `max_sent_tokens` | `JEV_MAX_SENT_TOKENS` | `0` | most tokens sent to Jev for one compaction, retries included and estimated, `0` for no cap |
 | `decision_log` | `JEV_DECISION_LOG` | empty | JSONL file where each decision on a tool call is appended, empty for none |
+| `incremental` | `JEV_INCREMENTAL` | `false` | `true` does not ask Jev again about the calls it already said to keep in an earlier compaction of the same session, while their content and the goal stay the same |
 | `max_parallel` | `JEV_MAX_PARALLEL` | `4` | requests sent to Jev at once, at least 1 |
 | `on_short` | `JEV_ON_SHORT` | `keep` | `keep` leaves a short reduction to the next stage, `done` stops the stack there, `revert` leaves the history as it was when the reduction is short |
 | `dry_run` | `JEV_DRY_RUN` | `false` | `true` computes what Jev would prune and changes nothing |
