@@ -1,12 +1,54 @@
 package jev
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"testing"
 
 	contracts "github.com/Herrscherd/herrscher-contracts"
 )
+
+type pruningHistory struct {
+	history contracts.History
+}
+
+func (p *pruningHistory) ReadHistory(context.Context) (contracts.History, error) {
+	return p.history, nil
+}
+
+func (p *pruningHistory) PruneHistory(_ context.Context, edits []contracts.HistoryEdit) (contracts.PruneOutcome, error) {
+	before := toolRunes(p.history)
+	byID := make(map[string]contracts.HistoryEdit, len(edits))
+	for _, edit := range edits {
+		byID[edit.CallID] = edit
+	}
+	edited := 0
+	for index := range p.history.Messages {
+		calls := p.history.Messages[index].Calls
+		for position := range calls {
+			edit, found := byID[calls[position].ID]
+			if !found {
+				continue
+			}
+			applyEdit(&calls[position], edit)
+			edited++
+		}
+	}
+	return contracts.PruneOutcome{Edited: edited, CharsBefore: before, CharsAfter: toolRunes(p.history)}, nil
+}
+
+func applyEdit(call *contracts.HistoryCall, edit contracts.HistoryEdit) {
+	if edit.Action == contracts.PruneCall {
+		call.Input = ""
+		call.Result = ""
+		return
+	}
+	runes := []rune(call.Result)
+	if edit.KeepChars < len(runes) {
+		call.Result = string(runes[:edit.KeepChars])
+	}
+}
 
 func TestLiveJevAnswersTheSessionHistory(t *testing.T) {
 	key := os.Getenv(typesafeEnv)
@@ -17,7 +59,8 @@ func TestLiveJevAnswersTheSessionHistory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newCompactor: %v", err)
 	}
-	editor := &fakeHistory{history: sessionHistory(), outcome: contracts.PruneOutcome{Edited: 1, CharsBefore: 1000, CharsAfter: 600}}
+	editor := &pruningHistory{history: sessionHistory()}
+	before := toolRunes(editor.history)
 	result, err := stage.Compact(t.Context(), contracts.CompactRequest{History: editor}, nil)
 	if err != nil {
 		t.Fatalf("Compact against the live API: %v", err)
@@ -31,10 +74,17 @@ func TestLiveJevAnswersTheSessionHistory(t *testing.T) {
 	if result.Note == "" {
 		t.Fatal("live compaction returned no note")
 	}
-	if len(editor.pruned) == 0 {
-		t.Fatal("live compaction pruned nothing, so no reduction can be checked")
+	after, err := editor.ReadHistory(t.Context())
+	if err != nil {
+		t.Fatalf("read the history after the live compaction: %v", err)
 	}
-	if editor.outcome.CharsAfter >= editor.outcome.CharsBefore {
-		t.Fatalf("reduction = %d -> %d chars, want fewer chars after the prune", editor.outcome.CharsBefore, editor.outcome.CharsAfter)
+	if result.Stats.CharsBefore != before {
+		t.Fatalf("reported characters before = %d, the history held %d", result.Stats.CharsBefore, before)
+	}
+	if measured := toolRunes(after); result.Stats.CharsAfter != measured {
+		t.Fatalf("reported characters after = %d, the pruned history holds %d", result.Stats.CharsAfter, measured)
+	}
+	if result.Stats.CharsAfter >= result.Stats.CharsBefore {
+		t.Fatalf("reduction = %d -> %d characters, want fewer after the live prune", result.Stats.CharsBefore, result.Stats.CharsAfter)
 	}
 }

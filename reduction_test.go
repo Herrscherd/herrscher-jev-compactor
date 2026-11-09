@@ -102,3 +102,22 @@ func TestRevertInTokensLeavesTheHistoryWhenNoPruningCouldReachTheTarget(t *testi
 		t.Fatalf("Jev was asked %v, want no question", got)
 	}
 }
+
+func TestEstimatedReductionSaysItIsAnEstimate(t *testing.T) {
+	stage := newTestCompactor(t, &fakeJev{answers: sessionAnswers()}, map[string]string{settingMinReduction: "0.2", settingReductionUnit: "tokens"})
+	editor := &fakeHistory{
+		history:       sessionHistory(),
+		outcome:       contracts.PruneOutcome{Edited: 2, CharsBefore: 1000, CharsAfter: 600},
+		afterPruneErr: errors.New("history unreadable after the prune"),
+	}
+	result, err := stage.Compact(t.Context(), contracts.CompactRequest{History: editor}, nil)
+	if err != nil {
+		t.Fatalf("Compact: %v", err)
+	}
+	if len(editor.pruned) != 1 {
+		t.Fatalf("PruneHistory calls = %d, want the edits applied", len(editor.pruned))
+	}
+	if want := stage.texts.english(noteEstimated, nil); !strings.Contains(result.Note, want) {
+		t.Fatalf("note = %q, want it to say the reduction is an estimate: %q", result.Note, want)
+	}
+}

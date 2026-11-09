@@ -4,7 +4,10 @@ go 1.27.0
 
 toolchain go1.27.3
 
-require github.com/Herrscherd/herrscher-contracts v0.28.0
+require (
+	github.com/Herrscherd/herrscher-contracts v0.28.0
+	golang.org/x/sys v0.48.0
+)
 
 require (
 	github.com/nicksnyder/go-i18n/v2 v2.7.0 // indirect

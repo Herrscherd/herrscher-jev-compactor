@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -57,14 +56,16 @@ func (j *decisionLog) locked(use func(*os.File) error) error {
 	if j.stopped {
 		return errDecisionLogStopped
 	}
-	lock, err := os.OpenFile(j.path+decisionLogLockSuffix, os.O_CREATE|os.O_WRONLY, decisionLogMode)
+	lock, err := openLockFile(j.path + decisionLogLockSuffix)
+	if err != nil {
+		return err
+	}
+	defer closeQuietly(lock)
+	unlock, err := lockFile(lock)
 	if err != nil {
 		return fmt.Errorf("decision log lock: %w", err)
 	}
-	defer closeQuietly(lock)
-	if err = syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
-		return fmt.Errorf("decision log lock: %w", err)
-	}
+	defer unlock()
 	if rotateErr := j.rotateIfFull(); rotateErr != nil {
 		return rotateErr
 	}
@@ -74,6 +75,18 @@ func (j *decisionLog) locked(use func(*os.File) error) error {
 	}
 	defer closeQuietly(file)
 	return use(file)
+}
+
+func openLockFile(path string) (*os.File, error) {
+	lock, err := os.OpenFile(filepath.Clean(path), os.O_CREATE|os.O_WRONLY, decisionLogMode)
+	if err != nil {
+		return nil, fmt.Errorf("decision log lock: %w", err)
+	}
+	if err = lock.Chmod(decisionLogMode); err != nil {
+		closeQuietly(lock)
+		return nil, fmt.Errorf("decision log lock: %w", err)
+	}
+	return lock, nil
 }
 
 func (j *decisionLog) rotateIfFull() error {

@@ -68,6 +68,7 @@ const (
 	noteSpendCapped          = "jev.note.spend_capped"
 	noteCacheHits            = "jev.note.cache_hits"
 	noteState                = "jev.note.state"
+	noteEstimated            = "jev.note.estimated"
 	errorStateAboveRequest   = "jev.error.state_above_request"
 )
 

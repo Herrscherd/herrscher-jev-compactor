@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -241,4 +242,57 @@ func TestDecisionLogSaysWhyAShortResultIsKept(t *testing.T) {
 		}
 	}
 	t.Fatal("no decision logged for the short result, want one kept for reason " + reasonShort)
+}
+
+func TestDecisionLogsSharingAPathKeepEveryLineWhenTheyRotate(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "decisions.jsonl")
+	journals := []*decisionLog{openDecisionLogWithLimit(path, 8<<10), openDecisionLogWithLimit(path, 8<<10)}
+	var writers sync.WaitGroup
+	for worker, journal := range journals {
+		writers.Go(func() {
+			for n := range 50 {
+				journal.write([]any{"worker", worker, "n", n})
+			}
+		})
+	}
+	writers.Wait()
+	entries := append(readDecisionLog(t, path+decisionLogBackupSuffix), readDecisionLog(t, path)...)
+	want := make([]float64, 50)
+	for n := range want {
+		want[n] = float64(n)
+	}
+	for worker := range journals {
+		if got := decisionSequence(t, entries, float64(worker)); !slices.Equal(got, want) {
+			t.Fatalf("worker %d lines in the files = %v, want 0 to 49 once each, in order", worker, got)
+		}
+	}
+}
+
+func decisionSequence(t *testing.T, entries []map[string]any, worker float64) []float64 {
+	t.Helper()
+	var sequence []float64
+	for _, entry := range entries {
+		if entry["worker"] != worker {
+			continue
+		}
+		n, isNumber := entry["n"].(float64)
+		if !isNumber {
+			t.Fatalf("entry %v has no numeric n", entry)
+		}
+		sequence = append(sequence, n)
+	}
+	return sequence
+}
+
+func TestDecisionLogLockFileIsOwnerOnly(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "decisions.jsonl")
+	lock := path + decisionLogLockSuffix
+	if err := os.WriteFile(lock, nil, 0o644); err != nil {
+		t.Fatalf("seed lock file: %v", err)
+	}
+	openDecisionLog(path)
+	info, err := os.Stat(lock)
+	if err != nil || info.Mode().Perm() != decisionLogMode {
+		t.Fatalf("lock mode = %v, %v, want %v", info, err, os.FileMode(decisionLogMode))
+	}
 }

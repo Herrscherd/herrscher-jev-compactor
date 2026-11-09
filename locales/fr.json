@@ -221,6 +221,11 @@
     "other": "{{.Count}} appels gardés depuis le cache, non réinterrogés."
   },
   {
+    "id": "jev.note.estimated",
+    "description": "Ajoutée à la note quand la réduction est une estimation : l'historique n'a pas pu être relu après l'élagage, la part prévue est donnée à la place de la part mesurée",
+    "other": "Réduction estimée : l'historique n'a pas pu être relu après l'élagage, c'est la part prévue qui est donnée"
+  },
+  {
     "id": "jev.note.state",
     "description": "Ajoutée à la note avec l'état donné à Jev : Tokens est sa taille en jetons, Stage l'étape d'ajustement qui l'a fait tenir",
     "other": "État lu par Jev : {{.Tokens}} jetons, ajusté par {{.Stage}}."

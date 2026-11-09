@@ -221,6 +221,11 @@
     "other": "{{.Count}} calls kept from the cache, not asked again."
   },
   {
+    "id": "jev.note.estimated",
+    "description": "Appended to the note when the reduction is estimated: the history could not be read after the prune, so the planned share is reported instead of the measured one",
+    "other": "The reduction is an estimate, the history could not be read again after the prune, so the planned share is reported"
+  },
+  {
     "id": "jev.note.state",
     "description": "Appended to the note with the state Jev was given: Tokens is its size in tokens, Stage the fitting stage that made it fit",
     "other": "State read by Jev: {{.Tokens}} tokens, fitted by {{.Stage}}."

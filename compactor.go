@@ -124,21 +124,21 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 	if err != nil {
 		return run.finish(contracts.CompactResult{}, contracts.CompactFailed), &unavailableError{cause: err}
 	}
-	reduction := c.reductionMeasured(ctx, req.History, outcome, history, report)
-	return c.result(run, report, outcome, reduction), nil
+	reduction, estimated := c.reductionMeasured(ctx, req.History, outcome, history, report)
+	return c.result(run, report, outcome, reduction, estimated), nil
 }
 
-func (c *compactor) reductionMeasured(ctx context.Context, editor contracts.HistoryEditor, outcome contracts.PruneOutcome, history contracts.History, report planReport) float64 {
+func (c *compactor) reductionMeasured(ctx context.Context, editor contracts.HistoryEditor, outcome contracts.PruneOutcome, history contracts.History, report planReport) (float64, bool) {
 	if c.opts.measureUnit() != unitEstimated {
-		return reductionOf(outcome, textRunes(history))
+		return reductionOf(outcome, textRunes(history)), false
 	}
 	after, err := editor.ReadHistory(ctx)
 	if err != nil {
 		slog.Warn("jev: history not read after the prune, the planned reduction is reported", "err", err)
-		return c.plannedShare(report, history)
+		return c.plannedShare(report, history), true
 	}
 	unit := c.opts.measureUnit()
-	return shareOf(unit.historySize(history)-unit.historySize(after), unit.historySize(history))
+	return shareOf(unit.historySize(history)-unit.historySize(after), unit.historySize(history)), false
 }
 
 func (c *compactor) reverted(run *compactRun, report planReport, key string, reduction float64) contracts.CompactResult {
@@ -182,7 +182,7 @@ func textRunes(history contracts.History) int {
 	return total
 }
 
-func (c *compactor) result(run *compactRun, report planReport, outcome contracts.PruneOutcome, reduction float64) contracts.CompactResult {
+func (c *compactor) result(run *compactRun, report planReport, outcome contracts.PruneOutcome, reduction float64, estimated bool) contracts.CompactResult {
 	if outcome.Edited == 0 {
 		return run.finish(contracts.CompactResult{Note: c.noteWith(report, noteNothingToPrune, nil)}, contracts.CompactSkipped)
 	}
@@ -206,8 +206,12 @@ func (c *compactor) result(run *compactRun, report planReport, outcome contracts
 	if done {
 		ended = contracts.CompactDone
 	}
+	note := c.noteWith(report, key, params)
+	if estimated {
+		note += ". " + c.texts.english(noteEstimated, nil)
+	}
 	return run.finish(contracts.CompactResult{
-		Note:   c.noteWith(report, key, params),
+		Note:   note,
 		Done:   done,
 		Notice: contracts.Notice{Code: contracts.CodeCompacted},
 	}, ended)
