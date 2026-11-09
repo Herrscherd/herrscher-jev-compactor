@@ -142,7 +142,7 @@ type planDecision struct {
 }
 
 func (c *compactor) verdictOf(report planReport, history contracts.History) planDecision {
-	if report.outOfReach {
+	if report.outOfReach && report.ceiling > 0 {
 		return planDecision{verdict: planOutOfReach, share: report.ceiling}
 	}
 	if len(report.edits) == 0 {

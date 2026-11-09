@@ -242,8 +242,11 @@ kept, truncated, pruned, unanswered, cached and reverted, and the reduction in
 characters and in estimated tokens. `-json` prints the same figures as JSON, with
 English keys whatever the language. `-lang en|fr` picks the language of the table,
 the help and the messages: `en` by default, any other value is a usage error. The
-bench never calls Jev and never reads the API key; its messages never echo a
-settings value, only the file and the line number.
+bench never calls Jev, never reads `TYPESAFE_API_KEY` and refuses `api_key` in a
+settings file. Its messages never echo the value of `api_key` or `endpoint`; for a
+malformed line they give the file and the line number. The messages of the command
+are translated; the detail of an error coming from the flag package, the system or
+Jev stays in English.
 
 Exit codes:
 

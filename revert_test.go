@@ -49,6 +49,22 @@ func TestRevertDoesNotAskJevWhenNoPruningCouldReachTheTarget(t *testing.T) {
 	}
 }
 
+func TestRevertWithNothingRemovableSkipsWithoutAskingJev(t *testing.T) {
+	server := &fakeJev{answers: sessionAnswers()}
+	stage := newTestCompactor(t, server, map[string]string{settingOnShort: "revert", settingMinReduction: "0.1", settingPreserveRecent: "1000"})
+	editor := &fakeHistory{history: sessionHistory()}
+	result, err := stage.Compact(t.Context(), contracts.CompactRequest{History: editor}, nil)
+	if err != nil {
+		t.Fatalf("Compact: %v", err)
+	}
+	if got := server.askedQuestions(); len(got) != 0 {
+		t.Fatalf("Jev was asked %v, want no question", got)
+	}
+	if len(editor.pruned) != 0 || result.Stats.Outcome != contracts.CompactSkipped {
+		t.Fatalf("pruned = %d, outcome = %v, want the history left alone and skipped", len(editor.pruned), result.Stats.Outcome)
+	}
+}
+
 func TestRevertAppliesTheEditsWhenThePlanReachesTheTarget(t *testing.T) {
 	server := &fakeJev{answers: sessionAnswers()}
 	stage := newTestCompactor(t, server, map[string]string{settingOnShort: "revert", settingMinReduction: "0.3"})

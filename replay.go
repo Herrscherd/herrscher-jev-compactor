@@ -1,6 +1,7 @@
 package jev
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -101,8 +102,15 @@ type snapshotCall struct {
 // DecodeSnapshot reads a snapshot written by a compaction. It refuses unknown
 // fields, data after the snapshot object, and anything past 64 MiB.
 func DecodeSnapshot(reader io.Reader) (Snapshot, error) {
+	data, err := io.ReadAll(io.LimitReader(reader, maxSnapshotBytes+1))
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("%w: %w", ErrInvalidSnapshot, err)
+	}
+	if len(data) > maxSnapshotBytes {
+		return Snapshot{}, fmt.Errorf("%w: larger than %d bytes", ErrInvalidSnapshot, maxSnapshotBytes)
+	}
 	var snapshot Snapshot
-	decoder := json.NewDecoder(io.LimitReader(reader, maxSnapshotBytes))
+	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&snapshot); err != nil {
 		return Snapshot{}, fmt.Errorf("%w: %w", ErrInvalidSnapshot, err)

@@ -293,6 +293,17 @@ func TestReplayNeverEchoesTheAPIKey(t *testing.T) {
 	}
 }
 
+func TestAnInvalidEndpointIsNeverEchoed(t *testing.T) {
+	const canary = "canary-query-secret-9b1c"
+	_, err := Replay(fixtureSnapshot(t), contracts.PluginConfig{Settings: map[string]string{settingEndpoint: "http://example.test/v1?key=" + canary}})
+	if !errors.Is(err, ErrInvalidSetting) {
+		t.Fatalf("Replay error = %v, want ErrInvalidSetting", err)
+	}
+	if strings.Contains(err.Error(), canary) {
+		t.Fatalf("the endpoint query leaked into %q", err)
+	}
+}
+
 func TestReplayOfNothingToPruneIsNotReverted(t *testing.T) {
 	snapshot := fixtureSnapshot(t)
 	for index := range snapshot.Judgments {

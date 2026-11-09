@@ -491,18 +491,13 @@ func (r *settingReader) endpoint() string {
 	}
 	parsed, err := url.Parse(value)
 	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil {
-		r.refuse(settingEndpoint, redactCredentials(value))
+		r.refuse(settingEndpoint, redactedValue)
 		return ""
 	}
 	return parsed.String()
 }
 
-func redactCredentials(value string) string {
-	if strings.Contains(value, "@") {
-		return "<redacted>"
-	}
-	return value
-}
+const redactedValue = "<redacted>"
 
 func parseRatio(text string) (float64, bool) {
 	parsed, err := strconv.ParseFloat(text, 64)

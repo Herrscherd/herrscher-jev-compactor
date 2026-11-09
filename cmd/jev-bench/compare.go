@@ -187,17 +187,13 @@ func readSnapshot(path string) (jev.Snapshot, error) {
 }
 
 func openRegular(path string) (*os.File, error) {
-	clean := filepath.Clean(path)
-	info, err := os.Stat(clean)
+	file, err := os.Open(filepath.Clean(path))
 	if err != nil {
 		return nil, fileError{path: path, kind: err}
 	}
-	if !info.Mode().IsRegular() {
-		return nil, fileError{path: path, kind: errNotRegular}
-	}
-	file, err := os.Open(clean)
-	if err != nil {
-		return nil, fileError{path: path, kind: err}
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() {
+		return nil, fileError{path: path, kind: errors.Join(errNotRegular, err, file.Close())}
 	}
 	return file, nil
 }

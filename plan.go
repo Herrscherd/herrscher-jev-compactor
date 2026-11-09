@@ -279,7 +279,7 @@ func (c *compactor) decide(ctx context.Context, history contracts.History, sessi
 	if c.opts.revertsShort() {
 		report.ceiling = c.reductionCeiling(calls, history)
 		if report.ceiling < c.opts.minReduction {
-			report.outOfReach = report.ceiling > 0
+			report.outOfReach = true
 			return report, nil
 		}
 	}
