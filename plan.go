@@ -240,13 +240,19 @@ func (c *compactor) plan(ctx context.Context, history contracts.History, instruc
 }
 
 func (c *compactor) reductionCeiling(calls []toolCall, history contracts.History) float64 {
+	unit := c.opts.measureUnit()
 	removable := 0
 	for _, call := range calls {
 		if !c.kept(call) {
-			removable += runeCount(call.source.Input) + call.resultRunes()
+			removable += unit.size(call.source.Input) + unit.size(call.source.Result)
 		}
 	}
-	return shareOf(removable, historyRunes(history))
+	return shareOf(removable, unit.historySize(history))
+}
+
+func (c *compactor) plannedShare(report planReport, history contracts.History) float64 {
+	unit := c.opts.measureUnit()
+	return shareOf(report.removed.in(unit), unit.historySize(history))
 }
 
 func (c *compactor) pinnedCount(calls []toolCall) int {

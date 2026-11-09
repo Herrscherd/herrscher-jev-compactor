@@ -65,6 +65,11 @@
     "other": "keep laisse une réduction insuffisante à l'étape suivante, done arrête la pile à cet endroit, revert laisse l'historique tel quel quand la réduction est insuffisante"
   },
   {
+    "id": "jev.setting.reduction_unit",
+    "description": "Help of the reduction_unit setting: the unit min_reduction is measured in",
+    "other": "unité dans laquelle min_reduction est mesuré : characters pour des caractères, ou tokens pour des jetons estimés sans tokenizer"
+  },
+  {
     "id": "jev.setting.dry_run",
     "description": "Help of the dry_run setting",
     "other": "true calcule ce que Jev élaguerait sans rien modifier"

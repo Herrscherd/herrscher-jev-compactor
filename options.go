@@ -28,6 +28,7 @@ const (
 	settingTimeout              = "timeout"
 	settingMaxParallel          = "max_parallel"
 	settingOnShort              = "on_short"
+	settingReductionUnit        = "reduction_unit"
 	settingDryRun               = "dry_run"
 	settingRules                = "rules"
 	settingPinInputs            = "pin_inputs"
@@ -182,6 +183,7 @@ type options struct {
 	timeout              time.Duration
 	maxParallel          int
 	onShort              onShort
+	reductionUnit        reductionUnit
 	dryRun               bool
 	policy               *callPolicy
 	keepErrors           bool
@@ -221,6 +223,10 @@ func (o options) shortRule() onShort {
 
 func (o options) revertsShort() bool {
 	return o.shortRule() == onShortRevert
+}
+
+func (o options) measureUnit() reductionUnit {
+	return orDefault(o.reductionUnit, unitCharacters)
 }
 
 func (o options) callKeepThreshold() float64 {
@@ -289,6 +295,7 @@ func settings(texts *messages) []contracts.Setting {
 		{Key: settingTimeout, Env: "JEV_TIMEOUT", Help: texts.english(helpTimeout, nil), Default: defaultTimeout.String()},
 		{Key: settingMaxParallel, Env: "JEV_MAX_PARALLEL", Help: texts.english(helpMaxParallel, nil), Default: strconv.Itoa(defaultMaxParallel)},
 		{Key: settingOnShort, Env: "JEV_ON_SHORT", Help: texts.english(helpOnShort, nil), Default: keepName},
+		{Key: settingReductionUnit, Env: "JEV_REDUCTION_UNIT", Help: texts.english(helpReductionUnit, nil), Default: unitNameCharacters},
 		{Key: settingDryRun, Env: "JEV_DRY_RUN", Help: texts.english(helpDryRun, nil), Default: "false"},
 		{Key: settingRules, Env: "JEV_RULES", Help: texts.english(helpRules, nil)},
 		{Key: settingPinInputs, Env: "JEV_PIN_INPUTS", Help: texts.english(helpPinInputs, nil)},
@@ -333,6 +340,7 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 		timeout:              read.duration(settingTimeout, defaultTimeout),
 		maxParallel:          read.count(settingMaxParallel, 0, 1),
 		onShort:              read.onShort(),
+		reductionUnit:        read.reductionUnit(),
 		dryRun:               read.flag(settingDryRun),
 		policy:               read.policy(),
 		keepErrors:           read.flag(settingKeepErrors),
@@ -459,6 +467,19 @@ func (r *settingReader) onShort() onShort {
 	parsed, valid := parseOnShort(value)
 	if !valid {
 		r.refuse(settingOnShort, value)
+		return 0
+	}
+	return parsed
+}
+
+func (r *settingReader) reductionUnit() reductionUnit {
+	value, ok := r.raw(settingReductionUnit)
+	if !ok {
+		return 0
+	}
+	parsed, valid := parseReductionUnit(value)
+	if !valid {
+		r.refuse(settingReductionUnit, value)
 		return 0
 	}
 	return parsed

@@ -94,7 +94,7 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 		return run.finish(contracts.CompactResult{Note: note}, contracts.CompactDryRun), nil
 	}
 	if c.opts.revertsShort() {
-		if planned := shareOf(report.removed.runes, historyRunes(history)); planned < c.opts.minReduction {
+		if planned := c.plannedShare(report, history); planned < c.opts.minReduction {
 			return c.reverted(run, noteReverted, planned), nil
 		}
 	}
@@ -102,7 +102,14 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 	if err != nil {
 		return run.finish(contracts.CompactResult{}, contracts.CompactFailed), &unavailableError{cause: err}
 	}
-	return c.result(run, report, outcome, textRunes(history)), nil
+	return c.result(run, report, outcome, c.reductionMeasured(report, outcome, history)), nil
+}
+
+func (c *compactor) reductionMeasured(report planReport, outcome contracts.PruneOutcome, history contracts.History) float64 {
+	if c.opts.measureUnit() == unitEstimated {
+		return c.plannedShare(report, history)
+	}
+	return reductionOf(outcome, textRunes(history))
 }
 
 func (c *compactor) reverted(run *compactRun, key string, reduction float64) contracts.CompactResult {
@@ -128,12 +135,11 @@ func textRunes(history contracts.History) int {
 	return total
 }
 
-func (c *compactor) result(run *compactRun, report planReport, outcome contracts.PruneOutcome, unchangedRunes int) contracts.CompactResult {
+func (c *compactor) result(run *compactRun, report planReport, outcome contracts.PruneOutcome, reduction float64) contracts.CompactResult {
 	if outcome.Edited == 0 {
 		return run.finish(contracts.CompactResult{Note: c.texts.english(noteNothingToPrune, nil)}, contracts.CompactSkipped)
 	}
 	run.reduce(report, outcome.CharsBefore, outcome.CharsAfter)
-	reduction := reductionOf(outcome, unchangedRunes)
 	params := map[string]any{
 		"Count":     run.stats.Calls,
 		"Kept":      run.kept(),

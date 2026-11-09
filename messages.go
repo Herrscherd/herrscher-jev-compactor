@@ -27,6 +27,7 @@ const (
 	helpTimeout              = "jev.setting.timeout"
 	helpMaxParallel          = "jev.setting.max_parallel"
 	helpOnShort              = "jev.setting.on_short"
+	helpReductionUnit        = "jev.setting.reduction_unit"
 	helpDryRun               = "jev.setting.dry_run"
 	helpRules                = "jev.setting.rules"
 	helpPinInputs            = "jev.setting.pin_inputs"

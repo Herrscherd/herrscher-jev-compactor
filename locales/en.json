@@ -65,6 +65,11 @@
     "other": "keep leaves a short reduction to the next stage, done stops the stack there, revert leaves the history as it was when the reduction is short"
   },
   {
+    "id": "jev.setting.reduction_unit",
+    "description": "Help of the reduction_unit setting: the unit min_reduction is measured in",
+    "other": "unit min_reduction is measured in: characters, or tokens estimated without a tokenizer"
+  },
+  {
     "id": "jev.setting.dry_run",
     "description": "Help of the dry_run setting",
     "other": "true computes what Jev would prune and changes nothing"

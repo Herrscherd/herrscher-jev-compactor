@@ -83,6 +83,14 @@ setting.
    is measured against the whole history, message text included, not only
    against the tool inputs and outputs the pruning touches.
 
+`reduction_unit` sets the unit the share is measured in. With `characters`, the
+default, the share counts the characters of the tool inputs and outputs, and
+the message text, as above. With `tokens`, it counts the tokens estimated as
+described below, of the same parts, and the reduction is the plan's estimate
+(the tokens it removes over the tokens of the history): `PruneOutcome` only
+reports characters, so the share cannot come from the backend in that unit.
+`max_removed_share` stays in characters.
+
 When `on_short` is `revert`, a pruning that falls short is not applied at all.
 Before Jev is asked, the stage takes the most pruning could remove, every
 unpinned call with its input and output, and if that stays under
@@ -157,6 +165,7 @@ history cannot be read or pruned, or when its context is cancelled.
 | `truncate_head` | `JEV_TRUNCATE_HEAD` | `300` | characters kept from an output Jev lets go |
 | `truncate_tail` | `JEV_TRUNCATE_TAIL` | `0` | characters kept from the end of an output Jev lets go |
 | `min_reduction` | `JEV_MIN_REDUCTION` | `0.25` | share of the history, 0 to 1, that stops the stack |
+| `reduction_unit` | `JEV_REDUCTION_UNIT` | `characters` | unit `min_reduction` is measured in: `characters`, or `tokens` estimated as below |
 | `max_state_tokens` | `JEV_MAX_STATE_TOKENS` | `25000` | token budget of the state |
 | `max_request_tokens` | `JEV_MAX_REQUEST_TOKENS` | `30000` | token budget of one request |
 | `timeout` | `JEV_TIMEOUT` | `2m0s` | timeout of one request, as a Go duration |
