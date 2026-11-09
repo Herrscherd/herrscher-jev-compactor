@@ -152,6 +152,15 @@ a `Retry-After` over 30s is not waited for, the failure stands and the stage
 steps aside as above. Other `4xx` answers, network errors and timeouts are
 never retried, and a wait ends with the context of the compaction.
 
+`max_requests` and `max_sent_tokens` cap what one compaction sends to Jev, retries
+included (the tokens are the same estimate `max_request_tokens` uses). Each
+attempt is counted before it is sent, so the cap holds across parallel batches.
+A batch that would go past the cap is not sent: its calls are kept, never pruned
+by default, and the note says the cap was reached with the requests and tokens
+actually sent. The decisions already taken still apply, and the stage is
+`skipped` when nothing was pruned. `0` (the default) means no cap. The Stats
+report the requests and tokens sent, whatever the cap.
+
 ## Settings
 
 | Key | Env | Default | Meaning |
@@ -178,6 +187,8 @@ never retried, and a wait ends with the context of the compaction.
 | `timeout` | `JEV_TIMEOUT` | `2m0s` | timeout of one request, as a Go duration |
 | `retries` | `JEV_RETRIES` | `0` | times a request is sent again after a 429 or a 5xx answer, at most 10, `0` for none |
 | `retry_backoff` | `JEV_RETRY_BACKOFF` | `1s` | first wait before a retry, as a Go duration, doubled at each retry and capped at 30s |
+| `max_requests` | `JEV_MAX_REQUESTS` | `0` | most requests sent to Jev for one compaction, retries included, `0` for no cap |
+| `max_sent_tokens` | `JEV_MAX_SENT_TOKENS` | `0` | most tokens sent to Jev for one compaction, retries included and estimated, `0` for no cap |
 | `max_parallel` | `JEV_MAX_PARALLEL` | `4` | requests sent to Jev at once, at least 1 |
 | `on_short` | `JEV_ON_SHORT` | `keep` | `keep` leaves a short reduction to the next stage, `done` stops the stack there, `revert` leaves the history as it was when the reduction is short |
 | `dry_run` | `JEV_DRY_RUN` | `false` | `true` computes what Jev would prune and changes nothing |

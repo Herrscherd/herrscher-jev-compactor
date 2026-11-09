@@ -2,6 +2,7 @@ package jev
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"math"
 	"net/http"
@@ -93,19 +94,22 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 		return run.finish(c.fallback(err), contracts.CompactFailed), nil
 	}
 	if report.outOfReach {
-		return c.reverted(run, noteOutOfReach, report.ceiling), nil
+		return c.reverted(run, report, noteOutOfReach, report.ceiling), nil
 	}
 	if len(report.edits) == 0 {
+		if report.capped {
+			return run.finish(contracts.CompactResult{Note: c.texts.english(noteSpendCapped, spendParams(report))}, contracts.CompactSkipped), nil
+		}
 		return run.finish(contracts.CompactResult{Note: c.texts.english(noteNothingToPrune, nil)}, contracts.CompactSkipped), nil
 	}
 	if c.opts.dryRun {
 		run.reduce(report, before, before-report.removed.runes)
-		note := c.texts.english(noteDryRun, map[string]any{"Count": len(report.edits)})
+		note := c.noteWith(report, noteDryRun, map[string]any{"Count": len(report.edits)})
 		return run.finish(contracts.CompactResult{Note: note}, contracts.CompactDryRun), nil
 	}
 	if c.opts.revertsShort() {
 		if planned := c.plannedShare(report, history); planned < c.opts.minReduction {
-			return c.reverted(run, noteReverted, planned), nil
+			return c.reverted(run, report, noteReverted, planned), nil
 		}
 	}
 	outcome, err := req.History.PruneHistory(ctx, report.edits)
@@ -122,10 +126,22 @@ func (c *compactor) reductionMeasured(report planReport, outcome contracts.Prune
 	return reductionOf(outcome, textRunes(history))
 }
 
-func (c *compactor) reverted(run *compactRun, key string, reduction float64) contracts.CompactResult {
+func (c *compactor) reverted(run *compactRun, report planReport, key string, reduction float64) contracts.CompactResult {
 	slog.Debug("jev: short of the target, history left as it was", "reason", key, "reduction", reduction, "target", c.opts.minReduction)
 	params := map[string]any{"Percent": wholePercent(reduction), "Target": wholePercent(c.opts.minReduction)}
-	return run.finish(contracts.CompactResult{Note: c.texts.english(key, params)}, contracts.CompactSkipped)
+	return run.finish(contracts.CompactResult{Note: c.noteWith(report, key, params)}, contracts.CompactSkipped)
+}
+
+func (c *compactor) noteWith(report planReport, key string, params map[string]any) string {
+	note := c.texts.english(key, params)
+	if !report.capped {
+		return note
+	}
+	return note + " " + c.texts.english(noteSpendCapped, spendParams(report))
+}
+
+func spendParams(report planReport) map[string]any {
+	return map[string]any{"Requests": report.sent.requests, "Tokens": report.sent.tokens}
 }
 
 func (c *compactor) fallback(cause error) contracts.CompactResult {
@@ -170,7 +186,7 @@ func (c *compactor) result(run *compactRun, report planReport, outcome contracts
 		ended = contracts.CompactDone
 	}
 	return run.finish(contracts.CompactResult{
-		Note:   c.texts.english(key, params),
+		Note:   c.noteWith(report, key, params),
 		Done:   done,
 		Notice: contracts.Notice{Code: contracts.CodeCompacted},
 	}, ended)
@@ -204,11 +220,10 @@ func (u sentUsage) plus(other sentUsage) sentUsage {
 	return sentUsage{requests: u.requests + other.requests, tokens: u.tokens + other.tokens}
 }
 
-func (c *compactor) askAll(ctx context.Context, state compactionState, batches [][]toolCall) (map[string]callAnswer, sentUsage, error) {
+func (c *compactor) askAll(ctx context.Context, state compactionState, batches [][]toolCall, spend *spendLedger) (map[string]callAnswer, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	results := make([]map[string]callAnswer, len(batches))
-	sent := make([]sentUsage, len(batches))
 	slots := make(chan struct{}, c.opts.parallelism())
 	var (
 		wg        sync.WaitGroup
@@ -219,36 +234,34 @@ func (c *compactor) askAll(ctx context.Context, state compactionState, batches [
 		wg.Go(func() {
 			slots <- struct{}{}
 			defer func() { <-slots }()
-			answers, usage, err := c.askBatch(ctx, state, batch)
-			sent[index] = usage
-			if err != nil {
+			decided, batchErr := c.askBatch(ctx, state, batch, spend)
+			if errors.Is(batchErr, ErrSpendCapped) {
+				return
+			}
+			if batchErr != nil {
 				firstFail.Do(func() {
-					failure = err
+					failure = batchErr
 					cancel()
 				})
 				return
 			}
-			results[index] = answers
+			results[index] = decided
 		})
 	}
 	wg.Wait()
-	var total sentUsage
-	for _, usage := range sent {
-		total = total.plus(usage)
-	}
 	if failure != nil {
-		return nil, total, failure
+		return nil, failure
 	}
-	merged := make(map[string]callAnswer)
-	for _, answers := range results {
-		for ref, answer := range answers {
-			merged[ref] = answer
+	answers := make(map[string]callAnswer)
+	for _, decided := range results {
+		for ref, answer := range decided {
+			answers[ref] = answer
 		}
 	}
-	return merged, total, nil
+	return answers, nil
 }
 
-func (c *compactor) askBatch(ctx context.Context, state compactionState, batch []toolCall) (map[string]callAnswer, sentUsage, error) {
+func (c *compactor) askBatch(ctx context.Context, state compactionState, batch []toolCall, spend *spendLedger) (map[string]callAnswer, error) {
 	questions := make(map[string]question, questionsPerCall*len(batch))
 	for _, call := range batch {
 		for name, asked := range questionsFor(call) {
@@ -257,24 +270,23 @@ func (c *compactor) askBatch(ctx context.Context, state compactionState, batch [
 	}
 	body, err := c.client.body(state, questions)
 	if err != nil {
-		return nil, sentUsage{}, err
+		return nil, err
 	}
-	usage := sentUsage{requests: 1, tokens: estimateTokens(body)}
-	answers, err := c.client.post(ctx, body)
+	answers, err := c.client.post(ctx, body, spend)
 	if err != nil {
-		return nil, usage, err
+		return nil, err
 	}
 	decided := make(map[string]callAnswer, len(batch))
 	for _, call := range batch {
 		keepCall, err := noul(answers, callQuestionPrefix+call.ref)
 		if err != nil {
-			return nil, usage, err
+			return nil, err
 		}
 		keepResult, err := noul(answers, resultQuestionPrefix+call.ref)
 		if err != nil {
-			return nil, usage, err
+			return nil, err
 		}
 		decided[call.ref] = callAnswer{keepCall: keepCall, keepResult: keepResult}
 	}
-	return decided, usage, nil
+	return decided, nil
 }

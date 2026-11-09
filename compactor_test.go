@@ -308,7 +308,7 @@ func TestAskAllReportsTheRefusalNotTheCancelledBatch(t *testing.T) {
 	})
 	stage := newTestCompactor(t, slowThenRefused, nil)
 	calls := collectCalls(sessionHistory(), 1)
-	_, _, err := stage.askAll(t.Context(), compactionState{}, [][]toolCall{{calls[0]}, {calls[1]}})
+	_, err := stage.askAll(t.Context(), compactionState{}, [][]toolCall{{calls[0]}, {calls[1]}}, newSpendLedger(0, 0))
 	if !errors.Is(err, ErrJevRefused) {
 		t.Fatalf("askAll error = %v, want ErrJevRefused", err)
 	}

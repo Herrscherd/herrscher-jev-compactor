@@ -51,6 +51,7 @@ const (
 	reasonThreshold = "threshold"
 	reasonBudget    = "budget"
 	reasonError     = "error"
+	reasonSpendCap  = "spend_cap"
 )
 
 func (d decision) String() string {
@@ -213,6 +214,7 @@ type planReport struct {
 	sent       sentUsage
 	ceiling    float64
 	outOfReach bool
+	capped     bool
 }
 
 func (c *compactor) plan(ctx context.Context, history contracts.History, instruction string) (planReport, error) {
@@ -227,8 +229,10 @@ func (c *compactor) plan(ctx context.Context, history contracts.History, instruc
 	}
 	decided, asked := c.decideLocally(calls)
 	if len(asked) > 0 {
-		answers, sent, err := c.judge(ctx, history, calls, asked, instruction)
-		report.sent = sent
+		spend := newSpendLedger(c.opts.maxRequests, c.opts.maxSentTokens)
+		answers, err := c.judge(ctx, history, calls, asked, instruction, spend)
+		report.sent = spend.total()
+		report.capped = spend.capped()
 		if err != nil {
 			return report, err
 		}
@@ -291,8 +295,12 @@ func (c *compactor) decideLocally(calls []toolCall) (map[string]plannedEdit, []t
 
 func (c *compactor) decideAsked(asked []toolCall, answers map[string]callAnswer, decided map[string]plannedEdit) {
 	for _, call := range asked {
+		answer, answered := answers[call.ref]
+		if !answered {
+			logDecision(call, decisionKeep, reasonSpendCap)
+			continue
+		}
 		picked := c.opts.policy.ruleFor(call.source.Tool)
-		answer := answers[call.ref]
 		limits := c.opts.thresholdsFor(picked)
 		verdict, flipped := c.keepErrorsVerdict(call, decideWith(call, answer, limits))
 		logDecision(call, verdict, reasonFor(flipped, reasonThreshold),
@@ -320,17 +328,17 @@ func (c *compactor) kept(call toolCall) bool {
 	return c.isPinned(call) || call.resultRunes() < c.opts.minResultChars
 }
 
-func (c *compactor) judge(ctx context.Context, history contracts.History, calls, asked []toolCall, instruction string) (map[string]callAnswer, sentUsage, error) {
+func (c *compactor) judge(ctx context.Context, history contracts.History, calls, asked []toolCall, instruction string, spend *spendLedger) (map[string]callAnswer, error) {
 	fitted, err := fitState(history, calls, c.opts.goalSettings().goal(history, instruction), c.opts)
 	if err != nil {
-		return nil, sentUsage{}, err
+		return nil, err
 	}
 	slog.Debug("jev: state fitted", "stage", fitted.stage, "tokens", fitted.tokens)
 	batches, err := batchCalls(asked, fitted.tokens, c.opts.maxRequestTokens)
 	if err != nil {
-		return nil, sentUsage{}, err
+		return nil, err
 	}
-	return c.askAll(ctx, fitted.state, batches)
+	return c.askAll(ctx, fitted.state, batches, spend)
 }
 
 func (c *compactor) keepErrorsVerdict(call toolCall, verdict decision) (decision, bool) {

@@ -51,6 +51,8 @@ const (
 	helpPreserveTurns        = "jev.setting.preserve_turns"
 	helpRetries              = "jev.setting.retries"
 	helpRetryBackoff         = "jev.setting.retry_backoff"
+	helpMaxRequests          = "jev.setting.max_requests"
+	helpMaxSent              = "jev.setting.max_sent_tokens"
 	noteFailed               = "jev.note.failed"
 	noteNoHistory            = "jev.note.no_history"
 	noteNothingToPrune       = "jev.note.nothing_to_prune"
@@ -60,6 +62,7 @@ const (
 	noteReverted             = "jev.note.reverted"
 	noteOutOfReach           = "jev.note.out_of_reach"
 	noteDryRun               = "jev.note.dry_run"
+	noteSpendCapped          = "jev.note.spend_capped"
 )
 
 type messages struct {

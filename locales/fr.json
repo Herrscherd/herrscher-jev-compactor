@@ -175,6 +175,16 @@
     "other": "tout ce qui suit le N-ième dernier message utilisateur n'est jamais élagué, 0 pour aucun"
   },
   {
+    "id": "jev.setting.max_requests",
+    "description": "Aide du réglage max_requests : le nombre maximal de requêtes envoyées à Jev pour une compaction, relances comprises, 0 pour aucun plafond",
+    "other": "nombre maximal de requêtes envoyées à Jev pour une compaction, relances comprises, 0 pour aucun plafond"
+  },
+  {
+    "id": "jev.setting.max_sent_tokens",
+    "description": "Aide du réglage max_sent_tokens : le nombre maximal de jetons envoyés à Jev pour une compaction, relances comprises et estimés, 0 pour aucun plafond",
+    "other": "nombre maximal de jetons envoyés à Jev pour une compaction, relances comprises et estimés, 0 pour aucun plafond"
+  },
+  {
     "id": "jev.setting.retries",
     "description": "Help of the retries setting: how many times a request to Jev is sent again on a 429 or a 5xx answer, 0 for none",
     "other": "nombre de nouvelles tentatives d'une requête Jev après une réponse 429 ou 5xx, au plus 10, 0 pour aucune"
@@ -183,6 +193,11 @@
     "id": "jev.setting.retry_backoff",
     "description": "Help of the retry_backoff setting: the first wait before a retry, as a Go duration, doubled at each retry",
     "other": "première attente avant une nouvelle tentative d'une requête Jev, en durée Go, doublée à chaque tentative, plafonnée à 30s"
+  },
+  {
+    "id": "jev.note.spend_capped",
+    "description": "Ajoutée à la note quand le plafond de dépense a arrêté les requêtes à Jev : Requests et Tokens sont ce qui a été envoyé, les appels non jugés restent dans l'historique",
+    "other": "plafond de dépense atteint après {{.Requests}} requêtes et environ {{.Tokens}} jetons envoyés à Jev, les appels non jugés restent dans l'historique"
   },
   {
     "id": "jev.note.failed",

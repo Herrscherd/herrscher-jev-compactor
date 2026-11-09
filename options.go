@@ -50,6 +50,8 @@ const (
 	settingPreserveTurns        = "preserve_turns"
 	settingRetries              = "retries"
 	settingRetryBackoff         = "retry_backoff"
+	settingMaxRequests          = "max_requests"
+	settingMaxSent              = "max_sent_tokens"
 )
 
 const (
@@ -208,6 +210,8 @@ type options struct {
 	preserveTurns        int
 	retries              int
 	retryBackoff         time.Duration
+	maxRequests          int
+	maxSentTokens        int
 }
 
 func (o options) preservation() preservation {
@@ -323,6 +327,8 @@ func settings(texts *messages) []contracts.Setting {
 		{Key: settingPreserveTurns, Env: "JEV_PRESERVE_TURNS", Help: texts.english(helpPreserveTurns, nil), Default: "0"},
 		{Key: settingRetries, Env: "JEV_RETRIES", Help: texts.english(helpRetries, nil), Default: strconv.Itoa(defaultRetries)},
 		{Key: settingRetryBackoff, Env: "JEV_RETRY_BACKOFF", Help: texts.english(helpRetryBackoff, nil), Default: defaultRetryBackoff.String()},
+		{Key: settingMaxRequests, Env: "JEV_MAX_REQUESTS", Help: texts.english(helpMaxRequests, nil), Default: "0"},
+		{Key: settingMaxSent, Env: "JEV_MAX_SENT_TOKENS", Help: texts.english(helpMaxSent, nil), Default: "0"},
 	}
 }
 
@@ -369,6 +375,8 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 		preserveTurns:        read.count(settingPreserveTurns, 0, 0),
 		retries:              read.count(settingRetries, defaultRetries, 0),
 		retryBackoff:         read.duration(settingRetryBackoff, defaultRetryBackoff),
+		maxRequests:          read.count(settingMaxRequests, 0, 0),
+		maxSentTokens:        read.count(settingMaxSent, 0, 0),
 	}
 	if opts.goalSource == goalSourceFixed && opts.goalText == "" {
 		read.refuse(settingGoalText, "")

@@ -84,7 +84,7 @@ func (c *jevClient) ask(ctx context.Context, state compactionState, questions ma
 	if err != nil {
 		return err
 	}
-	_, err = c.post(ctx, body)
+	_, err = c.post(ctx, body, newSpendLedger(0, 0))
 	return err
 }
 
@@ -92,8 +92,12 @@ func (c *jevClient) body(state compactionState, questions map[string]question) (
 	return encodeJSON(jevRequest{Model: c.model, State: state, Questions: questions})
 }
 
-func (c *jevClient) post(ctx context.Context, body string) (map[string]jevAnswer, error) {
+func (c *jevClient) post(ctx context.Context, body string, spend *spendLedger) (map[string]jevAnswer, error) {
+	tokens := estimateTokens(body)
 	for attempt := 0; ; attempt++ {
+		if err := spend.reserve(tokens); err != nil {
+			return nil, err
+		}
 		answers, err := c.send(ctx, body)
 		delay, retry := c.retryDelay(err, attempt)
 		if !retry {

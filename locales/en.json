@@ -175,6 +175,16 @@
     "other": "everything after the Nth last user message is never pruned, 0 for none"
   },
   {
+    "id": "jev.setting.max_requests",
+    "description": "Help of the max_requests setting: the most requests sent to Jev for one compaction, retries included, 0 for no cap",
+    "other": "most requests sent to Jev for one compaction, retries included, 0 for no cap"
+  },
+  {
+    "id": "jev.setting.max_sent_tokens",
+    "description": "Help of the max_sent_tokens setting: the most tokens sent to Jev for one compaction, retries included and estimated, 0 for no cap",
+    "other": "most tokens sent to Jev for one compaction, retries included and estimated, 0 for no cap"
+  },
+  {
     "id": "jev.setting.retries",
     "description": "Help of the retries setting: how many times a request to Jev is sent again on a 429 or a 5xx answer, 0 for none",
     "other": "times a Jev request is sent again after a 429 or a 5xx answer, at most 10, 0 for none"
@@ -183,6 +193,11 @@
     "id": "jev.setting.retry_backoff",
     "description": "Help of the retry_backoff setting: the first wait before a retry, as a Go duration, doubled at each retry",
     "other": "first wait before a Jev request is sent again, as a Go duration, doubled at each retry, capped at 30s"
+  },
+  {
+    "id": "jev.note.spend_capped",
+    "description": "Appended to the note when the spend cap stopped the requests to Jev: Requests and Tokens are what was sent, the calls not judged stay in the history",
+    "other": "spend cap reached after {{.Requests}} requests and about {{.Tokens}} tokens sent to Jev, the calls not judged stay in the history"
   },
   {
     "id": "jev.note.failed",
