@@ -13,39 +13,39 @@ import (
 )
 
 const (
-	settingAPIKey              = "api_key"
-	settingModel               = "model"
-	settingEndpoint            = "endpoint"
-	settingKeepThreshold       = "keep_threshold"
-	settingKeepCallThreshold   = "keep_call_threshold"
-	settingKeepResultThreshold = "keep_result_threshold"
-	settingPreserveRecent      = "preserve_recent"
-	settingTruncateHead        = "truncate_head"
-	settingMinReduction        = "min_reduction"
-	settingMaxStateTokens      = "max_state_tokens"
-	settingMaxRequestTokens    = "max_request_tokens"
-	settingTimeout             = "timeout"
-	settingMaxParallel         = "max_parallel"
-	settingOnShort             = "on_short"
-	settingDryRun              = "dry_run"
-	settingRules               = "rules"
-	settingPinInputs           = "pin_inputs"
-	settingKeepErrors          = "keep_errors"
-	settingMinResultChars      = "min_result_chars"
-	settingMaxPruned           = "max_pruned"
-	settingMaxRemovedShare     = "max_removed_share"
-	settingStateInputRunes     = "state_input_runes"
-	settingStateTextHead       = "state_text_head"
-	settingStateTextTail       = "state_text_tail"
-	settingStateContext        = "state_context"
-	settingStateStages         = "state_stages"
-	settingGoalSource          = "goal_source"
-	settingGoalText            = "goal_text"
-	settingGoalPrompts         = "goal_prompts"
-	settingGoalPromptRunes     = "goal_prompt_runes"
-	settingPreserveFirst       = "preserve_first"
-	settingPreserveRecentToken = "preserve_recent_tokens"
-	settingPreserveTurns       = "preserve_turns"
+	settingAPIKey               = "api_key"
+	settingModel                = "model"
+	settingEndpoint             = "endpoint"
+	settingKeepThreshold        = "keep_threshold"
+	settingKeepCallThreshold    = "keep_call_threshold"
+	settingKeepResultThreshold  = "keep_result_threshold"
+	settingPreserveRecent       = "preserve_recent"
+	settingTruncateHead         = "truncate_head"
+	settingMinReduction         = "min_reduction"
+	settingMaxStateTokens       = "max_state_tokens"
+	settingMaxRequestTokens     = "max_request_tokens"
+	settingTimeout              = "timeout"
+	settingMaxParallel          = "max_parallel"
+	settingOnShort              = "on_short"
+	settingDryRun               = "dry_run"
+	settingRules                = "rules"
+	settingPinInputs            = "pin_inputs"
+	settingKeepErrors           = "keep_errors"
+	settingMinResultChars       = "min_result_chars"
+	settingMaxPruned            = "max_pruned"
+	settingMaxRemovedShare      = "max_removed_share"
+	settingStateInputRunes      = "state_input_runes"
+	settingStateTextHead        = "state_text_head"
+	settingStateTextTail        = "state_text_tail"
+	settingStateContext         = "state_context"
+	settingStateStages          = "state_stages"
+	settingGoalSource           = "goal_source"
+	settingGoalText             = "goal_text"
+	settingGoalPrompts          = "goal_prompts"
+	settingGoalPromptRunes      = "goal_prompt_runes"
+	settingPreserveFirst        = "preserve_first"
+	settingPreserveRecentBudget = "preserve_recent_tokens"
+	settingPreserveTurns        = "preserve_turns"
 )
 
 const (
@@ -295,7 +295,7 @@ func settings(texts *messages) []contracts.Setting {
 		{Key: settingGoalPrompts, Env: "JEV_GOAL_PROMPTS", Help: texts.english(helpGoalPrompts, nil), Default: strconv.Itoa(defaultGoalPrompts)},
 		{Key: settingGoalPromptRunes, Env: "JEV_GOAL_PROMPT_RUNES", Help: texts.english(helpGoalPromptRunes, nil), Default: strconv.Itoa(defaultGoalPromptRunes)},
 		{Key: settingPreserveFirst, Env: "JEV_PRESERVE_FIRST", Help: texts.english(helpPreserveFirst, nil), Default: strconv.FormatBool(defaultPreserveFirst)},
-		{Key: settingPreserveRecentToken, Env: "JEV_PRESERVE_RECENT_TOKENS", Help: texts.english(helpPreserveRecentTokens, nil), Default: "0"},
+		{Key: settingPreserveRecentBudget, Env: "JEV_PRESERVE_RECENT_TOKENS", Help: texts.english(helpPreserveRecentBudget, nil), Default: "0"},
 		{Key: settingPreserveTurns, Env: "JEV_PRESERVE_TURNS", Help: texts.english(helpPreserveTurns, nil), Default: "0"},
 	}
 }
@@ -337,7 +337,7 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 		goalPrompts:          read.count(settingGoalPrompts, 0, 1),
 		goalPromptRunes:      read.count(settingGoalPromptRunes, 0, 1),
 		preserveFirst:        read.optionalFlag(settingPreserveFirst),
-		preserveRecentTokens: read.count(settingPreserveRecentToken, 0, 0),
+		preserveRecentTokens: read.count(settingPreserveRecentBudget, 0, 0),
 		preserveTurns:        read.count(settingPreserveTurns, 0, 0),
 	}
 	if opts.goalSource == goalSourceFixed && opts.goalText == "" {

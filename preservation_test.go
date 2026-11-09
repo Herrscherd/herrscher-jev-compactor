@@ -70,7 +70,7 @@ func TestPreservationSettingsAreRead(t *testing.T) {
 		{"defaults", nil, true, 0, 0},
 		{"first off", map[string]string{settingPreserveFirst: "false"}, false, 0, 0},
 		{"first on", map[string]string{settingPreserveFirst: "true"}, true, 0, 0},
-		{"tokens and turns", map[string]string{settingPreserveRecentToken: "500", settingPreserveTurns: "2"}, true, 500, 2},
+		{"tokens and turns", map[string]string{settingPreserveRecentBudget: "500", settingPreserveTurns: "2"}, true, 500, 2},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -89,8 +89,8 @@ func TestPreservationSettingsAreRead(t *testing.T) {
 func TestPreservationSettingsRefuseBadValues(t *testing.T) {
 	cases := []map[string]string{
 		{settingPreserveFirst: "maybe"},
-		{settingPreserveRecentToken: "-1"},
-		{settingPreserveRecentToken: "lots"},
+		{settingPreserveRecentBudget: "-1"},
+		{settingPreserveRecentBudget: "lots"},
 		{settingPreserveTurns: "-2"},
 		{settingPreserveTurns: "two"},
 	}

@@ -45,7 +45,7 @@ const (
 	helpGoalPrompts          = "jev.setting.goal_prompts"
 	helpGoalPromptRunes      = "jev.setting.goal_prompt_runes"
 	helpPreserveFirst        = "jev.setting.preserve_first"
-	helpPreserveRecentTokens = "jev.setting.preserve_recent_tokens"
+	helpPreserveRecentBudget = "jev.setting.preserve_recent_tokens"
 	helpPreserveTurns        = "jev.setting.preserve_turns"
 	noteFailed               = "jev.note.failed"
 	noteNoHistory            = "jev.note.no_history"
