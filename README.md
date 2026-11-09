@@ -177,8 +177,8 @@ one line per decision with the fields of the debug journal (`ref`, `tool`,
 decided). The file is opened in append mode and created with mode `0600`; an
 existing file keeps the mode it has. A file that cannot be opened or written is
 reported in the logs and the compaction goes on without it. Every process writing
-the same path takes an exclusive lock on `<file>.lock`, created with mode `0600`
-and left on disk after the compaction.
+the same path takes an exclusive lock on `<file>.lock`, set to mode `0600` each
+time it is opened and left on disk after the compaction.
 
 A tool call whose result is empty is not judged by default, and so is never pruned,
 because the history gives no way to tell a call still running from one that
