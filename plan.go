@@ -206,16 +206,25 @@ func (o options) thresholdsFor(picked rule) thresholds {
 }
 
 type planReport struct {
-	edits   []contracts.HistoryEdit
-	calls   int
-	pinned  int
-	removed removal
-	sent    sentUsage
+	edits      []contracts.HistoryEdit
+	calls      int
+	pinned     int
+	removed    removal
+	sent       sentUsage
+	ceiling    float64
+	outOfReach bool
 }
 
 func (c *compactor) plan(ctx context.Context, history contracts.History, instruction string) (planReport, error) {
 	calls := collectCallsWith(history, c.opts.preservation())
 	report := planReport{calls: len(calls), pinned: c.pinnedCount(calls)}
+	if c.opts.revertsShort() {
+		report.ceiling = c.reductionCeiling(calls, history)
+		if report.ceiling < c.opts.minReduction {
+			report.outOfReach = true
+			return report, nil
+		}
+	}
 	decided, asked := c.decideLocally(calls)
 	if len(asked) > 0 {
 		answers, sent, err := c.judge(ctx, history, calls, asked, instruction)
@@ -228,6 +237,16 @@ func (c *compactor) plan(ctx context.Context, history contracts.History, instruc
 	report.edits = c.withinBudget(history, calls, decided)
 	report.removed = removedTotals(calls, report.edits)
 	return report, nil
+}
+
+func (c *compactor) reductionCeiling(calls []toolCall, history contracts.History) float64 {
+	removable := 0
+	for _, call := range calls {
+		if !c.kept(call) {
+			removable += runeCount(call.source.Input) + call.resultRunes()
+		}
+	}
+	return shareOf(removable, historyRunes(history))
 }
 
 func (c *compactor) pinnedCount(calls []toolCall) int {

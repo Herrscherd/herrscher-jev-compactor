@@ -82,6 +82,9 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 		}
 		return run.finish(c.fallback(err), contracts.CompactFailed), nil
 	}
+	if report.outOfReach {
+		return c.reverted(run, noteOutOfReach, report.ceiling), nil
+	}
 	if len(report.edits) == 0 {
 		return run.finish(contracts.CompactResult{Note: c.texts.english(noteNothingToPrune, nil)}, contracts.CompactSkipped), nil
 	}
@@ -90,11 +93,22 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 		note := c.texts.english(noteDryRun, map[string]any{"Count": len(report.edits)})
 		return run.finish(contracts.CompactResult{Note: note}, contracts.CompactDryRun), nil
 	}
+	if c.opts.revertsShort() {
+		if planned := shareOf(report.removed.runes, historyRunes(history)); planned < c.opts.minReduction {
+			return c.reverted(run, noteReverted, planned), nil
+		}
+	}
 	outcome, err := req.History.PruneHistory(ctx, report.edits)
 	if err != nil {
 		return run.finish(contracts.CompactResult{}, contracts.CompactFailed), &unavailableError{cause: err}
 	}
 	return c.result(run, report, outcome, textRunes(history)), nil
+}
+
+func (c *compactor) reverted(run *compactRun, key string, reduction float64) contracts.CompactResult {
+	slog.Debug("jev: short of the target, history left as it was", "reason", key, "reduction", reduction, "target", c.opts.minReduction)
+	params := map[string]any{"Percent": wholePercent(reduction), "Target": wholePercent(c.opts.minReduction)}
+	return run.finish(contracts.CompactResult{Note: c.texts.english(key, params)}, contracts.CompactSkipped)
 }
 
 func (c *compactor) fallback(cause error) contracts.CompactResult {
@@ -156,6 +170,13 @@ func reductionOf(outcome contracts.PruneOutcome, unchangedRunes int) float64 {
 
 func wholePercent(ratio float64) int {
 	return int(math.Floor(ratio * percent))
+}
+
+func shareOf(part, whole int) float64 {
+	if whole <= 0 {
+		return 0
+	}
+	return float64(part) / float64(whole)
 }
 
 type sentUsage struct {

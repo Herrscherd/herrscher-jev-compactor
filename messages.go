@@ -54,6 +54,8 @@ const (
 	notePruned               = "jev.note.pruned"
 	notePrunedShort          = "jev.note.pruned_short"
 	notePrunedStopped        = "jev.note.pruned_stopped"
+	noteReverted             = "jev.note.reverted"
+	noteOutOfReach           = "jev.note.out_of_reach"
 	noteDryRun               = "jev.note.dry_run"
 )
 

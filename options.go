@@ -81,6 +81,7 @@ type onShort uint8
 const (
 	onShortKeep onShort = iota + 1
 	onShortDone
+	onShortRevert
 )
 
 func parseOnShort(text string) (onShort, bool) {
@@ -89,6 +90,8 @@ func parseOnShort(text string) (onShort, bool) {
 		return onShortKeep, true
 	case "done":
 		return onShortDone, true
+	case "revert":
+		return onShortRevert, true
 	}
 	return 0, false
 }
@@ -214,6 +217,10 @@ func (o options) parallelism() int {
 
 func (o options) shortRule() onShort {
 	return orDefault(o.onShort, defaultOnShort)
+}
+
+func (o options) revertsShort() bool {
+	return o.shortRule() == onShortRevert
 }
 
 func (o options) callKeepThreshold() float64 {

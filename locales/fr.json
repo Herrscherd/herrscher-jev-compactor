@@ -62,7 +62,7 @@
   {
     "id": "jev.setting.on_short",
     "description": "Help of the on_short setting",
-    "other": "keep laisse une réduction insuffisante à l'étape suivante, done arrête la pile à cet endroit"
+    "other": "keep laisse une réduction insuffisante à l'étape suivante, done arrête la pile à cet endroit, revert laisse l'historique tel quel quand la réduction est insuffisante"
   },
   {
     "id": "jev.setting.dry_run",
@@ -201,6 +201,16 @@
     "description": "The Jev stage reviewed Count tool calls and removed Percent percent of the history, below its Target percent, and on_short=done stops the stack here",
     "one": "Jev a examiné {{.Count}} appel d'outil : {{.Kept}} gardé, {{.Truncated}} tronqué, {{.Pruned}} supprimé, l'historique est plus court de {{.Percent}} %, sous les {{.Target}} % visés, la pile s'arrête ici",
     "other": "Jev a examiné {{.Count}} appels d'outil : {{.Kept}} gardés, {{.Truncated}} tronqués, {{.Pruned}} supprimés, l'historique est plus court de {{.Percent}} %, sous les {{.Target}} % visés, la pile s'arrête ici"
+  },
+  {
+    "id": "jev.note.reverted",
+    "description": "The Jev stage found the reduction of its plan short of the target, and on_short=revert leaves the history as it was for the next stage",
+    "other": "Jev retirerait {{.Percent}} % de l'historique, sous les {{.Target}} % visés : l'historique reste tel quel et l'étape suivante compacte"
+  },
+  {
+    "id": "jev.note.out_of_reach",
+    "description": "The Jev stage found that pruning every candidate could not reach the target, so Jev was not asked and on_short=revert leaves the history as it was",
+    "other": "Même en élaguant tous les candidats, Jev retirerait au plus {{.Percent}} % de l'historique, sous les {{.Target}} % visés : Jev n'a pas été interrogé et l'historique reste tel quel"
   },
   {
     "id": "jev.note.dry_run",

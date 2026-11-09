@@ -83,6 +83,17 @@ setting.
    is measured against the whole history, message text included, not only
    against the tool inputs and outputs the pruning touches.
 
+When `on_short` is `revert`, a pruning that falls short is not applied at all.
+Before Jev is asked, the stage takes the most pruning could remove, every
+unpinned call with its input and output, and if that stays under
+`min_reduction` it does not ask Jev and leaves the history as it was. After Jev
+answers, it measures the share the plan removes, the text it takes out, and
+calls `PruneHistory` only when that share reaches the target. The plan measure
+is an estimate: the backend writes a note in place of each pruned output and
+shortens the inputs, so the real share can differ slightly from it. When the
+edits are applied and still fall short, they stay applied and the note reports
+the short reduction, as `keep` does.
+
 ### Rules, pins and budgets
 
 `pin_inputs` keeps, without asking Jev, every call whose input contains one of
@@ -150,7 +161,7 @@ history cannot be read or pruned, or when its context is cancelled.
 | `max_request_tokens` | `JEV_MAX_REQUEST_TOKENS` | `30000` | token budget of one request |
 | `timeout` | `JEV_TIMEOUT` | `2m0s` | timeout of one request, as a Go duration |
 | `max_parallel` | `JEV_MAX_PARALLEL` | `4` | requests sent to Jev at once, at least 1 |
-| `on_short` | `JEV_ON_SHORT` | `keep` | `keep` leaves a short reduction to the next stage, `done` stops the stack there |
+| `on_short` | `JEV_ON_SHORT` | `keep` | `keep` leaves a short reduction to the next stage, `done` stops the stack there, `revert` leaves the history as it was when the reduction is short |
 | `dry_run` | `JEV_DRY_RUN` | `false` | `true` computes what Jev would prune and changes nothing |
 | `state_input_runes` | `JEV_STATE_INPUT_RUNES` | `1000,200,60` | three cut levels of tool inputs in the state, longest first: full, short, line |
 | `state_text_head` | `JEV_STATE_TEXT_HEAD` | `400` | characters kept at the head of a long text when the state abridges it |

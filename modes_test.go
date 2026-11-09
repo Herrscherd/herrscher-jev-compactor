@@ -10,7 +10,7 @@ import (
 func TestParseOptionsRefusesBadModes(t *testing.T) {
 	cases := map[string]string{
 		settingMaxParallel: "0",
-		settingOnShort:     "revert",
+		settingOnShort:     "undo",
 		settingDryRun:      "maybe",
 	}
 	for key, value := range cases {
