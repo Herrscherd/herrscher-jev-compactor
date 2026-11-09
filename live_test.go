@@ -59,7 +59,7 @@ func TestLiveJevAnswersTheSessionHistory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newCompactor: %v", err)
 	}
-	editor := &pruningHistory{history: sessionHistory()}
+	editor := &pruningHistory{history: fixtureHistory(t)}
 	before := toolRunes(editor.history)
 	result, err := stage.Compact(t.Context(), contracts.CompactRequest{History: editor}, nil)
 	if err != nil {

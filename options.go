@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -55,6 +56,7 @@ const (
 	settingMaxSent              = "max_sent_tokens"
 	settingDecisionLog          = "decision_log"
 	settingIncremental          = "incremental"
+	settingReplayDir            = "replay_dir"
 )
 
 const (
@@ -239,6 +241,7 @@ type options struct {
 	maxRequests          int
 	maxSentTokens        int
 	decisionLog          string
+	replayDir            string
 }
 
 func (o options) preservation() preservation {
@@ -359,6 +362,7 @@ func settings(texts *messages) []contracts.Setting {
 		{Key: settingMaxRequests, Env: "JEV_MAX_REQUESTS", Help: texts.english(helpMaxRequests, nil), Default: "0"},
 		{Key: settingMaxSent, Env: "JEV_MAX_SENT_TOKENS", Help: texts.english(helpMaxSent, nil), Default: "0"},
 		{Key: settingDecisionLog, Env: "JEV_DECISION_LOG", Help: texts.english(helpDecisionLog, nil)},
+		{Key: settingReplayDir, Env: "JEV_REPLAY_DIR", Help: texts.english(helpReplayDir, nil)},
 	}
 }
 
@@ -372,13 +376,16 @@ func refuseIncoherent(read *settingReader, opts options) {
 }
 
 func parseOptions(cfg contracts.PluginConfig) (options, error) {
-	apiKey := cfg.Get(settingAPIKey)
-	if apiKey == "" {
+	if cfg.Get(settingAPIKey) == "" {
 		return options{}, &missingKeyError{}
 	}
+	return readOptions(cfg)
+}
+
+func readOptions(cfg contracts.PluginConfig) (options, error) {
 	read := settingReader{cfg: cfg, texts: newMessages()}
 	opts := options{
-		apiKey:               apiKey,
+		apiKey:               cfg.Get(settingAPIKey),
 		model:                read.text(settingModel, defaultModel),
 		endpoint:             read.endpoint(),
 		keepThreshold:        read.ratio(settingKeepThreshold, defaultKeepThreshold),
@@ -419,6 +426,7 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 		maxRequests:          read.count(settingMaxRequests, 0, 0),
 		maxSentTokens:        read.count(settingMaxSent, 0, 0),
 		decisionLog:          read.text(settingDecisionLog, ""),
+		replayDir:            read.replayDir(),
 	}
 	if opts.goalSource == goalSourceFixed && opts.goalText == "" {
 		read.refuse(settingGoalText, "")
@@ -448,6 +456,14 @@ func (r *settingReader) refuseStateAboveRequest(state, request int) {
 		setting: settingMaxStateTokens + ", " + settingMaxRequestTokens,
 		value:   strconv.Itoa(state) + ", " + strconv.Itoa(request),
 	}
+}
+
+func (r *settingReader) replayDir() string {
+	dir := r.cfg.Get(settingReplayDir)
+	if info, err := os.Stat(dir); err == nil && !info.IsDir() {
+		r.refuse(settingReplayDir, dir)
+	}
+	return dir
 }
 
 func (r *settingReader) raw(key string) (string, bool) {

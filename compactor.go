@@ -49,10 +49,11 @@ func unavailableNotice(reason string) contracts.Notice {
 }
 
 type compactor struct {
-	opts   options
-	client *jevClient
-	texts  *messages
-	cache  *keepCache
+	opts     options
+	client   *jevClient
+	texts    *messages
+	cache    *keepCache
+	settings map[string]string
 }
 
 func newCompactor(cfg contracts.PluginConfig, texts *messages, httpClient *http.Client) (*compactor, error) {
@@ -65,8 +66,9 @@ func newCompactor(cfg contracts.PluginConfig, texts *messages, httpClient *http.
 		cache = newKeepCache()
 	}
 	return &compactor{
-		opts:  opts,
-		cache: cache,
+		opts:     opts,
+		cache:    cache,
+		settings: effectiveSettings(cfg, texts),
 		client: &jevClient{
 			http:     refusingClient(httpClient, opts.timeout),
 			endpoint: opts.endpoint,
@@ -95,6 +97,7 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 	journal := openDecisionLog(c.opts.decisionLog)
 	report, err := c.plan(ctx, history, req, journal)
 	run.examine(report)
+	c.capture(history, report)
 	if err != nil {
 		if ctx.Err() != nil {
 			return run.finish(contracts.CompactResult{}, contracts.CompactFailed), &unavailableError{cause: err}
@@ -110,10 +113,8 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 		}
 		return run.finish(contracts.CompactResult{Note: c.noteWith(report, noteNothingToPrune, nil)}, contracts.CompactSkipped), nil
 	}
-	if c.opts.revertsShort() {
-		if planned := c.plannedShare(report, history); planned < c.opts.minReduction {
-			return c.reverted(run, report, noteReverted, planned), nil
-		}
+	if planned, short := c.shortOfTarget(report, history); short {
+		return c.reverted(run, report, noteReverted, planned), nil
 	}
 	if c.opts.dryRun {
 		run.reduce(report, before, before-report.removed.runes)

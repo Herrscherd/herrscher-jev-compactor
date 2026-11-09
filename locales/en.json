@@ -200,6 +200,11 @@
     "other": "JSONL file where each decision on a tool call is appended, created with mode 0600, empty for none"
   },
   {
+    "id": "jev.setting.replay_dir",
+    "description": "Help of the replay_dir setting: the directory where each compaction writes a JSON snapshot to replay, empty for none",
+    "other": "directory where each compaction writes a JSON snapshot for replay, created with mode 0700, empty for none"
+  },
+  {
     "id": "jev.setting.retries",
     "description": "Help of the retries setting: how many times a request to Jev is sent again on a 429 or a 5xx answer, 0 for none",
     "other": "times a Jev request is sent again after a 429 or a 5xx answer, at most 10, 0 for none"

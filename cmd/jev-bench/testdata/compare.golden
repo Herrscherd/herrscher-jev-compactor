@@ -1,0 +1,6 @@
+snapshots: 1
+SETTING   KEPT  TRUNCATED  PRUNED  UNANSWERED  REVERTED  CHARS  TOKENS
+recorded  3     2          1       0           0         17.3%  16.5%
+strict    1     0          5       0           0         63.2%  60.1%
+loose     6     0          0       0           0         0.0%   0.0%
+revert    6     0          0       0           1         0.0%   0.0%

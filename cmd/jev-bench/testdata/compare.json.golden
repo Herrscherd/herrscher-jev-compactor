@@ -1,0 +1,45 @@
+{
+  "snapshots": 1,
+  "settings": [
+    {
+      "setting": "recorded",
+      "kept": 3,
+      "truncated": 2,
+      "pruned": 1,
+      "unanswered": 0,
+      "reverted": 0,
+      "chars_reduction": 0.17309340188517566,
+      "tokens_reduction": 0.16506189821182943
+    },
+    {
+      "setting": "strict",
+      "kept": 1,
+      "truncated": 0,
+      "pruned": 5,
+      "unanswered": 0,
+      "reverted": 0,
+      "chars_reduction": 0.6319622964867181,
+      "tokens_reduction": 0.6011004126547456
+    },
+    {
+      "setting": "loose",
+      "kept": 6,
+      "truncated": 0,
+      "pruned": 0,
+      "unanswered": 0,
+      "reverted": 0,
+      "chars_reduction": 0,
+      "tokens_reduction": 0
+    },
+    {
+      "setting": "revert",
+      "kept": 6,
+      "truncated": 0,
+      "pruned": 0,
+      "unanswered": 0,
+      "reverted": 1,
+      "chars_reduction": 0,
+      "tokens_reduction": 0
+    }
+  ]
+}

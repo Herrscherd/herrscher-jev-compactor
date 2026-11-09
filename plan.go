@@ -234,7 +234,10 @@ type planReport struct {
 	outOfReach bool
 	capped     bool
 	cached     int
+	unanswered int
 	state      stateReport
+	goal       string
+	judgments  []Judgment
 }
 
 type stateReport struct {
@@ -242,9 +245,36 @@ type stateReport struct {
 	stage  string
 }
 
+type answerFunc func(ctx context.Context, calls, asked []toolCall) (answerSet, error)
+
+type answerSet struct {
+	answers map[string]callAnswer
+	sent    sentUsage
+	capped  bool
+	state   stateReport
+}
+
 func (c *compactor) plan(ctx context.Context, history contracts.History, req contracts.CompactRequest, journal *decisionLog) (planReport, error) {
+	goal := c.opts.goalSettings().goal(history, req.Instruction)
+	return c.decide(ctx, history, req.Session, goal, c.liveAnswers(history, goal), journal)
+}
+
+func (c *compactor) liveAnswers(history contracts.History, goal string) answerFunc {
+	return func(ctx context.Context, calls, asked []toolCall) (answerSet, error) {
+		spend := newSpendLedger(c.opts.maxRequests, c.opts.maxSentTokens)
+		answers, fitted, err := c.judge(ctx, history, calls, asked, goal, spend)
+		return answerSet{
+			answers: answers,
+			sent:    spend.total(),
+			capped:  spend.capped(),
+			state:   stateReport{tokens: fitted.tokens, stage: fitted.stage},
+		}, err
+	}
+}
+
+func (c *compactor) decide(ctx context.Context, history contracts.History, session contracts.SessionInfo, goal string, answer answerFunc, journal *decisionLog) (planReport, error) {
 	calls := collectCallsWith(history, c.opts.preservation(), c.opts.includeEmpty)
-	report := planReport{calls: len(calls), pinned: c.pinnedCount(calls)}
+	report := planReport{calls: len(calls), pinned: c.pinnedCount(calls), goal: goal}
 	if c.opts.revertsShort() {
 		report.ceiling = c.reductionCeiling(calls, history)
 		if report.ceiling < c.opts.minReduction {
@@ -253,24 +283,42 @@ func (c *compactor) plan(ctx context.Context, history contracts.History, req con
 		}
 	}
 	decided, unknown := c.decideLocally(calls, journal)
-	goal := c.opts.goalSettings().goal(history, req.Instruction)
-	scope := c.scopeFor(req.Session, goal)
+	scope := c.scopeFor(session, goal)
 	asked := scope.partition(unknown, journal)
 	report.cached = len(unknown) - len(asked)
 	if len(asked) > 0 {
-		spend := newSpendLedger(c.opts.maxRequests, c.opts.maxSentTokens)
-		answers, fitted, err := c.judge(ctx, history, calls, asked, goal, spend)
-		report.sent = spend.total()
-		report.capped = spend.capped()
-		report.state = stateReport{tokens: fitted.tokens, stage: fitted.stage}
+		set, err := answer(ctx, calls, asked)
+		report.sent = set.sent
+		report.capped = set.capped
+		report.state = set.state
+		report.judgments = judgmentsOf(asked, set.answers)
+		report.unanswered = len(asked) - len(report.judgments)
 		if err != nil {
 			return report, err
 		}
-		scope.remember(c.decideAsked(asked, answers, decided, journal))
+		scope.remember(c.decideAsked(asked, set.answers, decided, journal))
 	}
 	report.edits = c.withinBudget(history, calls, decided, journal)
 	report.removed = removedTotals(calls, report.edits)
 	return report, nil
+}
+
+func judgmentsOf(asked []toolCall, answers map[string]callAnswer) []Judgment {
+	var judgments []Judgment
+	for _, call := range asked {
+		if answer, answered := answers[call.ref]; answered {
+			judgments = append(judgments, Judgment{CallID: call.source.ID, PCall: answer.keepCall, PResult: answer.keepResult})
+		}
+	}
+	return judgments
+}
+
+func (c *compactor) shortOfTarget(report planReport, history contracts.History) (float64, bool) {
+	if !c.opts.revertsShort() {
+		return 0, false
+	}
+	planned := c.plannedShare(report, history)
+	return planned, planned < c.opts.minReduction
 }
 
 func (c *compactor) reductionCeiling(calls []toolCall, history contracts.History) float64 {

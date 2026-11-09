@@ -55,6 +55,7 @@ const (
 	helpMaxRequests          = "jev.setting.max_requests"
 	helpMaxSent              = "jev.setting.max_sent_tokens"
 	helpDecisionLog          = "jev.setting.decision_log"
+	helpReplayDir            = "jev.setting.replay_dir"
 	helpIncremental          = "jev.setting.incremental"
 	noteFailed               = "jev.note.failed"
 	noteNoHistory            = "jev.note.no_history"
