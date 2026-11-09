@@ -32,6 +32,7 @@ const (
 	helpRules                = "jev.setting.rules"
 	helpPinInputs            = "jev.setting.pin_inputs"
 	helpKeepErrors           = "jev.setting.keep_errors"
+	helpIncludeEmpty         = "jev.setting.include_empty_results"
 	helpMinResultChars       = "jev.setting.min_result_chars"
 	helpKeepCallThreshold    = "jev.setting.keep_call_threshold"
 	helpKeepResultThreshold  = "jev.setting.keep_result_threshold"

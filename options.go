@@ -33,6 +33,7 @@ const (
 	settingRules                = "rules"
 	settingPinInputs            = "pin_inputs"
 	settingKeepErrors           = "keep_errors"
+	settingIncludeEmpty         = "include_empty_results"
 	settingMinResultChars       = "min_result_chars"
 	settingMaxPruned            = "max_pruned"
 	settingMaxRemovedShare      = "max_removed_share"
@@ -70,6 +71,7 @@ const (
 	defaultMaxParallel      = 4
 	defaultOnShort          = onShortKeep
 	defaultKeepErrors       = false
+	defaultIncludeEmpty     = false
 	defaultMinResultChars   = 0
 	defaultMaxPruned        = 0
 	defaultFullInputRunes   = 1000
@@ -194,6 +196,7 @@ type options struct {
 	dryRun               bool
 	policy               *callPolicy
 	keepErrors           bool
+	includeEmpty         bool
 	minResultChars       int
 	maxPruned            int
 	maxRemovedShare      float64
@@ -312,6 +315,7 @@ func settings(texts *messages) []contracts.Setting {
 		{Key: settingRules, Env: "JEV_RULES", Help: texts.english(helpRules, nil)},
 		{Key: settingPinInputs, Env: "JEV_PIN_INPUTS", Help: texts.english(helpPinInputs, nil)},
 		{Key: settingKeepErrors, Env: "JEV_KEEP_ERRORS", Help: texts.english(helpKeepErrors, nil), Default: strconv.FormatBool(defaultKeepErrors)},
+		{Key: settingIncludeEmpty, Env: "JEV_INCLUDE_EMPTY_RESULTS", Help: texts.english(helpIncludeEmpty, nil), Default: strconv.FormatBool(defaultIncludeEmpty)},
 		{Key: settingMinResultChars, Env: "JEV_MIN_RESULT_CHARS", Help: texts.english(helpMinResultChars, nil), Default: strconv.Itoa(defaultMinResultChars)},
 		{Key: settingMaxPruned, Env: "JEV_MAX_PRUNED", Help: texts.english(helpMaxPruned, nil), Default: strconv.Itoa(defaultMaxPruned)},
 		{Key: settingMaxRemovedShare, Env: "JEV_MAX_REMOVED_SHARE", Help: texts.english(helpMaxRemovedShare, nil), Default: strconv.FormatFloat(fullShare, 'g', -1, 64)},
@@ -361,6 +365,7 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 		dryRun:               read.flag(settingDryRun),
 		policy:               read.policy(),
 		keepErrors:           read.flag(settingKeepErrors),
+		includeEmpty:         read.flag(settingIncludeEmpty),
 		minResultChars:       read.count(settingMinResultChars, defaultMinResultChars, 0),
 		maxPruned:            read.count(settingMaxPruned, defaultMaxPruned, 0),
 		maxRemovedShare:      read.share(settingMaxRemovedShare),

@@ -90,6 +90,11 @@
     "other": "true garde le résultat d'un appel d'outil en échec, pour qu'il ne soit pas élagué avec son appel"
   },
   {
+    "id": "jev.setting.include_empty_results",
+    "description": "Help of the include_empty_results setting: whether tool calls with an empty result are judged by Jev too",
+    "other": "true juge aussi les appels d'outil dont le résultat est vide, ce qui peut inclure des appels encore en cours"
+  },
+  {
     "id": "jev.setting.min_result_chars",
     "description": "Help of the min_result_chars setting",
     "other": "les résultats plus courts que ce nombre de caractères sont toujours gardés, sans demander à Jev"

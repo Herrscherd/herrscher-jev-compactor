@@ -32,15 +32,15 @@ func (c toolCall) status() string {
 }
 
 func collectCalls(history contracts.History, preserveRecent int) []toolCall {
-	return collectCallsWith(history, preservation{first: true, recent: preserveRecent})
+	return collectCallsWith(history, preservation{first: true, recent: preserveRecent}, false)
 }
 
-func collectCallsWith(history contracts.History, keep preservation) []toolCall {
+func collectCallsWith(history contracts.History, keep preservation, includeEmpty bool) []toolCall {
 	var calls []toolCall
 	pinned := keep.pinnedMessages(history.Messages)
 	for index := range history.Messages {
 		for _, call := range history.Messages[index].Calls {
-			if call.Result == "" {
+			if call.Result == "" && !includeEmpty {
 				continue
 			}
 			calls = append(calls, toolCall{

@@ -168,6 +168,12 @@ decided). The file is opened in append mode and created with mode `0600`; an
 existing file keeps the mode it has. A file that cannot be opened or written is
 reported in the logs and the compaction goes on without it.
 
+A tool call whose result is empty is not judged by default, and so is never pruned,
+because the history gives no way to tell a call still running from one that
+answered with nothing. `include_empty_results=true` judges those calls too, so a
+call still running can be pruned or truncated before it returns. Keep it off unless
+the calls with an empty result are the ones to reduce.
+
 ## Settings
 
 | Key | Env | Default | Meaning |
@@ -181,6 +187,7 @@ reported in the logs and the compaction goes on without it.
 | `rules` | `JEV_RULES` | none | per-tool actions, see below |
 | `pin_inputs` | `JEV_PIN_INPUTS` | none | comma-separated substrings: a call whose input contains one always stays |
 | `keep_errors` | `JEV_KEEP_ERRORS` | `false` | `true` keeps the output of a failed call, so a pruned call keeps its error |
+| `include_empty_results` | `JEV_INCLUDE_EMPTY_RESULTS` | `false` | `true` also judges calls whose result is empty, which can include calls still running |
 | `min_result_chars` | `JEV_MIN_RESULT_CHARS` | `0` | outputs shorter than this many characters always stay |
 | `max_pruned` | `JEV_MAX_PRUNED` | `0` | most tool calls one compaction prunes, `0` for no limit |
 | `max_removed_share` | `JEV_MAX_REMOVED_SHARE` | `1` | most of the history, 0 to 1, one compaction may remove, `1` for no limit |

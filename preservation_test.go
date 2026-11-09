@@ -50,7 +50,7 @@ func TestPinnedMessagesFollowThePreservation(t *testing.T) {
 
 func TestCollectCallsWithMarksThePinnedCalls(t *testing.T) {
 	history := contracts.History{Messages: preservedHistory()}
-	calls := collectCallsWith(history, preservation{turns: 2})
+	calls := collectCallsWith(history, preservation{turns: 2}, false)
 	if len(calls) != 2 {
 		t.Fatalf("collectCallsWith returned %d calls, want 2", len(calls))
 	}

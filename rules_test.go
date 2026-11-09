@@ -126,6 +126,7 @@ func TestParseOptionsRefusesBadRulesWithInvalidSetting(t *testing.T) {
 		{settingMaxRemovedShare: "0"},
 		{settingMaxPruned: "-1"},
 		{settingKeepErrors: "yes"},
+		{settingIncludeEmpty: "yes"},
 		{settingMinResultChars: "-3"},
 	} {
 		settings[settingAPIKey] = "key"

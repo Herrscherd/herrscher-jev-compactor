@@ -220,7 +220,7 @@ type planReport struct {
 }
 
 func (c *compactor) plan(ctx context.Context, history contracts.History, instruction string, journal *decisionLog) (planReport, error) {
-	calls := collectCallsWith(history, c.opts.preservation())
+	calls := collectCallsWith(history, c.opts.preservation(), c.opts.includeEmpty)
 	report := planReport{calls: len(calls), pinned: c.pinnedCount(calls)}
 	if c.opts.revertsShort() {
 		report.ceiling = c.reductionCeiling(calls, history)

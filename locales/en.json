@@ -90,6 +90,11 @@
     "other": "true keeps the result of a failed tool call, so it is never pruned away with its call"
   },
   {
+    "id": "jev.setting.include_empty_results",
+    "description": "Help of the include_empty_results setting: whether tool calls with an empty result are judged by Jev too",
+    "other": "true also judges tool calls whose result is empty, which can include calls still running"
+  },
+  {
     "id": "jev.setting.min_result_chars",
     "description": "Help of the min_result_chars setting",
     "other": "results shorter than this many characters are always kept, without asking Jev"
