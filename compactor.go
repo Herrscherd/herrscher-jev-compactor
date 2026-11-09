@@ -12,9 +12,8 @@ import (
 )
 
 const (
-	maxParallelRequests = 4
-	percent             = 100
-	questionsPerCall    = 2
+	percent          = 100
+	questionsPerCall = 2
 )
 
 var (
@@ -82,6 +81,9 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 	if len(edits) == 0 {
 		return contracts.CompactResult{Note: c.texts.english(noteNothingToPrune, nil)}, nil
 	}
+	if c.opts.dryRun {
+		return contracts.CompactResult{Note: c.texts.english(noteDryRun, map[string]any{"Count": len(edits)})}, nil
+	}
 	outcome, err := req.History.PruneHistory(ctx, edits)
 	if err != nil {
 		return contracts.CompactResult{}, &unavailableError{cause: err}
@@ -112,11 +114,13 @@ func (c *compactor) result(outcome contracts.PruneOutcome, unchangedRunes int) c
 	}
 	reduction := reductionOf(outcome, unchangedRunes)
 	params := map[string]any{"Count": outcome.Edited, "Percent": wholePercent(reduction)}
-	done := reduction >= c.opts.minReduction
-	key := notePruned
-	if !done {
-		key = notePrunedShort
+	key, done := notePruned, true
+	if reduction < c.opts.minReduction {
+		key, done = notePrunedShort, false
 		params["Target"] = wholePercent(c.opts.minReduction)
+		if c.opts.shortRule() == onShortDone {
+			key, done = notePrunedStopped, true
+		}
 	}
 	return contracts.CompactResult{
 		Note:   c.texts.english(key, params),
@@ -174,7 +178,7 @@ func (c *compactor) askAll(ctx context.Context, state compactionState, batches [
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	results := make([]map[string]callAnswer, len(batches))
-	slots := make(chan struct{}, maxParallelRequests)
+	slots := make(chan struct{}, c.opts.parallelism())
 	var (
 		wg        sync.WaitGroup
 		firstFail sync.Once
