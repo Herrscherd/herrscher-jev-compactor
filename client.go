@@ -66,11 +66,20 @@ type jevClient struct {
 	model    string
 }
 
-func (c *jevClient) ask(ctx context.Context, state compactionState, questions map[string]question) (map[string]jevAnswer, error) {
-	body, err := encodeJSON(jevRequest{Model: c.model, State: state, Questions: questions})
+func (c *jevClient) ask(ctx context.Context, state compactionState, questions map[string]question) error {
+	body, err := c.body(state, questions)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	_, err = c.post(ctx, body)
+	return err
+}
+
+func (c *jevClient) body(state compactionState, questions map[string]question) (string, error) {
+	return encodeJSON(jevRequest{Model: c.model, State: state, Questions: questions})
+}
+
+func (c *jevClient) post(ctx context.Context, body string) (map[string]jevAnswer, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewBufferString(body))
 	if err != nil {
 		return nil, fmt.Errorf("jev: build request: %w", err)

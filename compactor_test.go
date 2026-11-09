@@ -265,7 +265,7 @@ func assertFallsBack(t *testing.T, stage *compactor) {
 
 func TestJevRefusalNeverLeaksTheAPIKey(t *testing.T) {
 	stage := newTestCompactor(t, &fakeJev{status: http.StatusUnauthorized, echoAuth: true}, nil)
-	_, refusal := stage.client.ask(t.Context(), compactionState{}, nil)
+	refusal := stage.client.ask(t.Context(), compactionState{}, nil)
 	if !errors.Is(refusal, ErrJevRefused) || !strings.Contains(refusal.Error(), "Bearer "+redactedMarker) {
 		t.Fatalf("ask error = %v, want a refusal echoing the redacted header", refusal)
 	}
@@ -308,7 +308,7 @@ func TestAskAllReportsTheRefusalNotTheCancelledBatch(t *testing.T) {
 	})
 	stage := newTestCompactor(t, slowThenRefused, nil)
 	calls := collectCalls(sessionHistory(), 1)
-	_, err := stage.askAll(t.Context(), compactionState{}, [][]toolCall{{calls[0]}, {calls[1]}})
+	_, _, err := stage.askAll(t.Context(), compactionState{}, [][]toolCall{{calls[0]}, {calls[1]}})
 	if !errors.Is(err, ErrJevRefused) {
 		t.Fatalf("askAll error = %v, want ErrJevRefused", err)
 	}

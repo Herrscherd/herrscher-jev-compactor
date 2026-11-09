@@ -11,11 +11,11 @@ func planWith(t *testing.T, history contracts.History, settings map[string]strin
 	t.Helper()
 	server := &fakeJev{answers: sessionAnswers()}
 	stage := newTestCompactor(t, server, settings)
-	edits, err := stage.plan(t.Context(), history, "")
+	report, err := stage.plan(t.Context(), history, "")
 	if err != nil {
 		t.Fatalf("plan: %v", err)
 	}
-	return edits, server
+	return report.edits, server
 }
 
 func editOf(edits []contracts.HistoryEdit, callID string) (contracts.HistoryEdit, bool) {

@@ -110,24 +110,57 @@ func editFor(call toolCall, verdict decision, truncateHead int) (contracts.Histo
 	return contracts.HistoryEdit{}, false
 }
 
-func removedRunes(call toolCall, edit contracts.HistoryEdit) int {
+func removedText(call toolCall, edit contracts.HistoryEdit) string {
 	switch edit.Action {
 	case contracts.PruneResult:
-		return max(call.resultRunes()-edit.KeepChars, 0)
+		result := call.source.Result
+		head := runePrefix(result, edit.KeepChars)
+		tail := runeSuffix(result, edit.KeepTail)
+		if len(head)+len(tail) >= len(result) {
+			return ""
+		}
+		return result[len(head) : len(result)-len(tail)]
 	case contracts.PruneCall:
-		return call.resultRunes()
+		return call.source.Result
 	}
-	return 0
+	return ""
 }
 
-func historyRunes(history contracts.History) int {
-	total := textRunes(history)
+func removedRunes(call toolCall, edit contracts.HistoryEdit) int {
+	return runeCount(removedText(call, edit))
+}
+
+type removal struct {
+	runes  int
+	tokens int
+}
+
+func removedTotals(calls []toolCall, edits []contracts.HistoryEdit) removal {
+	var total removal
+	byID := make(map[string]toolCall, len(calls))
+	for _, call := range calls {
+		byID[call.source.ID] = call
+	}
+	for _, edit := range edits {
+		text := removedText(byID[edit.CallID], edit)
+		total.runes += runeCount(text)
+		total.tokens += estimateTokens(text)
+	}
+	return total
+}
+
+func toolRunes(history contracts.History) int {
+	total := 0
 	for index := range history.Messages {
 		for _, call := range history.Messages[index].Calls {
 			total += runeCount(call.Input) + runeCount(call.Result)
 		}
 	}
 	return total
+}
+
+func historyRunes(history contracts.History) int {
+	return textRunes(history) + toolRunes(history)
 }
 
 func (o options) thresholdsFor(picked rule) thresholds {
@@ -137,24 +170,46 @@ func (o options) thresholdsFor(picked rule) thresholds {
 	}
 }
 
-func (c *compactor) plan(ctx context.Context, history contracts.History, instruction string) ([]contracts.HistoryEdit, error) {
+type planReport struct {
+	edits   []contracts.HistoryEdit
+	calls   int
+	pinned  int
+	removed removal
+	sent    sentUsage
+}
+
+func (c *compactor) plan(ctx context.Context, history contracts.History, instruction string) (planReport, error) {
 	calls := collectCallsWith(history, c.opts.preservation())
+	report := planReport{calls: len(calls), pinned: c.pinnedCount(calls)}
 	decided, asked := c.decideLocally(calls)
 	if len(asked) > 0 {
-		answers, err := c.judge(ctx, history, calls, asked, instruction)
+		answers, sent, err := c.judge(ctx, history, calls, asked, instruction)
+		report.sent = sent
 		if err != nil {
-			return nil, err
+			return report, err
 		}
 		c.decideAsked(asked, answers, decided)
 	}
-	return c.withinBudget(history, calls, decided), nil
+	report.edits = c.withinBudget(history, calls, decided)
+	report.removed = removedTotals(calls, report.edits)
+	return report, nil
+}
+
+func (c *compactor) pinnedCount(calls []toolCall) int {
+	count := 0
+	for _, call := range calls {
+		if c.isPinned(call) {
+			count++
+		}
+	}
+	return count
 }
 
 func (c *compactor) decideLocally(calls []toolCall) (map[string]plannedEdit, []toolCall) {
 	decided := make(map[string]plannedEdit)
 	var asked []toolCall
 	for _, call := range calls {
-		if call.pinned || c.kept(call) {
+		if c.kept(call) {
 			continue
 		}
 		picked := c.opts.policy.ruleFor(call.source.Tool)
@@ -181,19 +236,23 @@ func (c *compactor) decideAsked(asked []toolCall, answers map[string]callAnswer,
 	}
 }
 
-func (c *compactor) kept(call toolCall) bool {
-	return call.resultRunes() < c.opts.minResultChars || c.opts.policy.pinned(call.source.Input)
+func (c *compactor) isPinned(call toolCall) bool {
+	return call.pinned || c.opts.policy.pinned(call.source.Input)
 }
 
-func (c *compactor) judge(ctx context.Context, history contracts.History, calls, asked []toolCall, instruction string) (map[string]callAnswer, error) {
+func (c *compactor) kept(call toolCall) bool {
+	return c.isPinned(call) || call.resultRunes() < c.opts.minResultChars
+}
+
+func (c *compactor) judge(ctx context.Context, history contracts.History, calls, asked []toolCall, instruction string) (map[string]callAnswer, sentUsage, error) {
 	fitted, err := fitState(history, calls, c.opts.goalSettings().goal(history, instruction), c.opts)
 	if err != nil {
-		return nil, err
+		return nil, sentUsage{}, err
 	}
 	slog.Debug("jev: state fitted", "stage", fitted.stage, "tokens", fitted.tokens)
 	batches, err := batchCalls(asked, fitted.tokens, c.opts.maxRequestTokens)
 	if err != nil {
-		return nil, err
+		return nil, sentUsage{}, err
 	}
 	return c.askAll(ctx, fitted.state, batches)
 }
