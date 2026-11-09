@@ -66,9 +66,11 @@ func (d decision) String() string {
 	return ""
 }
 
-func logDecision(call toolCall, verdict decision, reason string, attrs ...any) {
+func logDecision(journal *decisionLog, call toolCall, verdict decision, reason string, attrs ...any) {
 	fields := []any{"ref", call.ref, "tool", call.source.Tool, "verdict", verdict.String(), "reason", reason, "result_size", call.resultRunes()}
-	slog.Debug("jev: call decided", append(fields, attrs...)...)
+	fields = append(fields, attrs...)
+	slog.Debug(decisionLogEvent, fields...)
+	journal.write(fields)
 }
 
 func questionsFor(call toolCall) map[string]question {
@@ -217,7 +219,7 @@ type planReport struct {
 	capped     bool
 }
 
-func (c *compactor) plan(ctx context.Context, history contracts.History, instruction string) (planReport, error) {
+func (c *compactor) plan(ctx context.Context, history contracts.History, instruction string, journal *decisionLog) (planReport, error) {
 	calls := collectCallsWith(history, c.opts.preservation())
 	report := planReport{calls: len(calls), pinned: c.pinnedCount(calls)}
 	if c.opts.revertsShort() {
@@ -227,7 +229,7 @@ func (c *compactor) plan(ctx context.Context, history contracts.History, instruc
 			return report, nil
 		}
 	}
-	decided, asked := c.decideLocally(calls)
+	decided, asked := c.decideLocally(calls, journal)
 	if len(asked) > 0 {
 		spend := newSpendLedger(c.opts.maxRequests, c.opts.maxSentTokens)
 		answers, err := c.judge(ctx, history, calls, asked, instruction, spend)
@@ -236,9 +238,9 @@ func (c *compactor) plan(ctx context.Context, history contracts.History, instruc
 		if err != nil {
 			return report, err
 		}
-		c.decideAsked(asked, answers, decided)
+		c.decideAsked(asked, answers, decided, journal)
 	}
-	report.edits = c.withinBudget(history, calls, decided)
+	report.edits = c.withinBudget(history, calls, decided, journal)
 	report.removed = removedTotals(calls, report.edits)
 	return report, nil
 }
@@ -269,13 +271,13 @@ func (c *compactor) pinnedCount(calls []toolCall) int {
 	return count
 }
 
-func (c *compactor) decideLocally(calls []toolCall) (map[string]plannedEdit, []toolCall) {
+func (c *compactor) decideLocally(calls []toolCall, journal *decisionLog) (map[string]plannedEdit, []toolCall) {
 	decided := make(map[string]plannedEdit)
 	var asked []toolCall
 	for _, call := range calls {
 		if c.kept(call) {
 			if c.isPinned(call) {
-				logDecision(call, decisionKeep, reasonPinned)
+				logDecision(journal, call, decisionKeep, reasonPinned)
 			}
 			continue
 		}
@@ -285,7 +287,7 @@ func (c *compactor) decideLocally(calls []toolCall) (map[string]plannedEdit, []t
 			continue
 		}
 		verdict, flipped := c.keepErrorsVerdict(call, picked.action.decision())
-		logDecision(call, verdict, reasonFor(flipped, reasonRule), "rule", strings.Join(picked.patterns, ","))
+		logDecision(journal, call, verdict, reasonFor(flipped, reasonRule), "rule", strings.Join(picked.patterns, ","))
 		if edit, ok := c.verdictEdit(call, verdict, c.opts.truncationFor(picked), ruleDecided); ok {
 			decided[call.ref] = edit
 		}
@@ -293,17 +295,17 @@ func (c *compactor) decideLocally(calls []toolCall) (map[string]plannedEdit, []t
 	return decided, asked
 }
 
-func (c *compactor) decideAsked(asked []toolCall, answers map[string]callAnswer, decided map[string]plannedEdit) {
+func (c *compactor) decideAsked(asked []toolCall, answers map[string]callAnswer, decided map[string]plannedEdit, journal *decisionLog) {
 	for _, call := range asked {
 		answer, answered := answers[call.ref]
 		if !answered {
-			logDecision(call, decisionKeep, reasonSpendCap)
+			logDecision(journal, call, decisionKeep, reasonSpendCap)
 			continue
 		}
 		picked := c.opts.policy.ruleFor(call.source.Tool)
 		limits := c.opts.thresholdsFor(picked)
 		verdict, flipped := c.keepErrorsVerdict(call, decideWith(call, answer, limits))
-		logDecision(call, verdict, reasonFor(flipped, reasonThreshold),
+		logDecision(journal, call, verdict, reasonFor(flipped, reasonThreshold),
 			"p_call", answer.keepCall, "p_result", answer.keepResult,
 			"call_threshold", limits.call, "result_threshold", limits.result)
 		keep := max(answer.keepCall, answer.keepResult)
@@ -356,7 +358,7 @@ func (c *compactor) verdictEdit(call toolCall, verdict decision, cut truncation,
 	return plannedEdit{edit: edit, keep: keep, removed: removedRunes(call, edit)}, true
 }
 
-func (c *compactor) withinBudget(history contracts.History, calls []toolCall, decided map[string]plannedEdit) []contracts.HistoryEdit {
+func (c *compactor) withinBudget(history contracts.History, calls []toolCall, decided map[string]plannedEdit, journal *decisionLog) []contracts.HistoryEdit {
 	var planned []plannedEdit
 	for _, call := range calls {
 		if edit, ok := decided[call.ref]; ok {
@@ -364,18 +366,18 @@ func (c *compactor) withinBudget(history contracts.History, calls []toolCall, de
 		}
 	}
 	edits := fitBudget(planned, c.opts.budget(), historyRunes(history))
-	c.logBudgetDemotions(calls, decided, edits)
+	c.logBudgetDemotions(calls, decided, edits, journal)
 	return edits
 }
 
-func (c *compactor) logBudgetDemotions(calls []toolCall, decided map[string]plannedEdit, edits []contracts.HistoryEdit) {
+func (c *compactor) logBudgetDemotions(calls []toolCall, decided map[string]plannedEdit, edits []contracts.HistoryEdit, journal *decisionLog) {
 	kept := make(map[string]bool, len(edits))
 	for _, edit := range edits {
 		kept[edit.CallID] = true
 	}
 	for _, call := range calls {
 		if _, ok := decided[call.ref]; ok && !kept[call.source.ID] {
-			logDecision(call, decisionKeep, reasonBudget)
+			logDecision(journal, call, decisionKeep, reasonBudget)
 		}
 	}
 }

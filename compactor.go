@@ -85,7 +85,9 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 	}
 	before := toolRunes(history)
 	run.chars(before, before)
-	report, err := c.plan(ctx, history, req.Instruction)
+	journal := openDecisionLog(c.opts.decisionLog)
+	defer journal.close()
+	report, err := c.plan(ctx, history, req.Instruction, journal)
 	run.examine(report)
 	if err != nil {
 		if ctx.Err() != nil {

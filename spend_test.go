@@ -71,7 +71,7 @@ func TestDecideAskedKeepsCallsWithoutAnAnswer(t *testing.T) {
 	stage := newTestCompactor(t, &fakeJev{answers: sessionAnswers()}, nil)
 	calls := collectCalls(sessionHistory(), 1)
 	decided := make(map[string]plannedEdit)
-	stage.decideAsked(calls, make(map[string]callAnswer), decided)
+	stage.decideAsked(calls, make(map[string]callAnswer), decided, nil)
 	if len(decided) != 0 {
 		t.Fatalf("decided = %v, want every call without an answer kept", decided)
 	}

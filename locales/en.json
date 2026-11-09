@@ -185,6 +185,11 @@
     "other": "most tokens sent to Jev for one compaction, retries included and estimated, 0 for no cap"
   },
   {
+    "id": "jev.setting.decision_log",
+    "description": "Help of the decision_log setting: the JSONL file where each decision on a tool call is appended, empty for none",
+    "other": "JSONL file where each decision on a tool call is appended, created with mode 0600, empty for none"
+  },
+  {
     "id": "jev.setting.retries",
     "description": "Help of the retries setting: how many times a request to Jev is sent again on a 429 or a 5xx answer, 0 for none",
     "other": "times a Jev request is sent again after a 429 or a 5xx answer, at most 10, 0 for none"

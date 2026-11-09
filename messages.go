@@ -53,6 +53,7 @@ const (
 	helpRetryBackoff         = "jev.setting.retry_backoff"
 	helpMaxRequests          = "jev.setting.max_requests"
 	helpMaxSent              = "jev.setting.max_sent_tokens"
+	helpDecisionLog          = "jev.setting.decision_log"
 	noteFailed               = "jev.note.failed"
 	noteNoHistory            = "jev.note.no_history"
 	noteNothingToPrune       = "jev.note.nothing_to_prune"

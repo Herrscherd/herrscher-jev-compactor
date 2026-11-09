@@ -52,6 +52,7 @@ const (
 	settingRetryBackoff         = "retry_backoff"
 	settingMaxRequests          = "max_requests"
 	settingMaxSent              = "max_sent_tokens"
+	settingDecisionLog          = "decision_log"
 )
 
 const (
@@ -212,6 +213,7 @@ type options struct {
 	retryBackoff         time.Duration
 	maxRequests          int
 	maxSentTokens        int
+	decisionLog          string
 }
 
 func (o options) preservation() preservation {
@@ -329,6 +331,7 @@ func settings(texts *messages) []contracts.Setting {
 		{Key: settingRetryBackoff, Env: "JEV_RETRY_BACKOFF", Help: texts.english(helpRetryBackoff, nil), Default: defaultRetryBackoff.String()},
 		{Key: settingMaxRequests, Env: "JEV_MAX_REQUESTS", Help: texts.english(helpMaxRequests, nil), Default: "0"},
 		{Key: settingMaxSent, Env: "JEV_MAX_SENT_TOKENS", Help: texts.english(helpMaxSent, nil), Default: "0"},
+		{Key: settingDecisionLog, Env: "JEV_DECISION_LOG", Help: texts.english(helpDecisionLog, nil)},
 	}
 }
 
@@ -377,6 +380,7 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 		retryBackoff:         read.duration(settingRetryBackoff, defaultRetryBackoff),
 		maxRequests:          read.count(settingMaxRequests, 0, 0),
 		maxSentTokens:        read.count(settingMaxSent, 0, 0),
+		decisionLog:          read.text(settingDecisionLog, ""),
 	}
 	if opts.goalSource == goalSourceFixed && opts.goalText == "" {
 		read.refuse(settingGoalText, "")

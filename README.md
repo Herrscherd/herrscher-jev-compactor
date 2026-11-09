@@ -161,6 +161,13 @@ actually sent. The decisions already taken still apply, and the stage is
 `skipped` when nothing was pruned. `0` (the default) means no cap. The Stats
 report the requests and tokens sent, whatever the cap.
 
+`decision_log` names a JSONL file where every decision on a tool call is appended,
+one line per decision with the fields of the debug journal (`ref`, `tool`,
+`verdict`, `reason`, `result_size`, and the probabilities and thresholds when Jev
+decided). The file is opened in append mode and created with mode `0600`; an
+existing file keeps the mode it has. A file that cannot be opened or written is
+reported in the logs and the compaction goes on without it.
+
 ## Settings
 
 | Key | Env | Default | Meaning |
@@ -189,6 +196,7 @@ report the requests and tokens sent, whatever the cap.
 | `retry_backoff` | `JEV_RETRY_BACKOFF` | `1s` | first wait before a retry, as a Go duration, doubled at each retry and capped at 30s |
 | `max_requests` | `JEV_MAX_REQUESTS` | `0` | most requests sent to Jev for one compaction, retries included, `0` for no cap |
 | `max_sent_tokens` | `JEV_MAX_SENT_TOKENS` | `0` | most tokens sent to Jev for one compaction, retries included and estimated, `0` for no cap |
+| `decision_log` | `JEV_DECISION_LOG` | empty | JSONL file where each decision on a tool call is appended, empty for none |
 | `max_parallel` | `JEV_MAX_PARALLEL` | `4` | requests sent to Jev at once, at least 1 |
 | `on_short` | `JEV_ON_SHORT` | `keep` | `keep` leaves a short reduction to the next stage, `done` stops the stack there, `revert` leaves the history as it was when the reduction is short |
 | `dry_run` | `JEV_DRY_RUN` | `false` | `true` computes what Jev would prune and changes nothing |
