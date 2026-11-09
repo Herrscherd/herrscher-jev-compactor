@@ -17,12 +17,20 @@ import (
 )
 
 type fakeHistory struct {
-	history contracts.History
-	outcome contracts.PruneOutcome
-	pruned  [][]contracts.HistoryEdit
+	history       contracts.History
+	outcome       contracts.PruneOutcome
+	afterPrune    *contracts.History
+	afterPruneErr error
+	pruned        [][]contracts.HistoryEdit
 }
 
 func (f *fakeHistory) ReadHistory(context.Context) (contracts.History, error) {
+	if f.afterPruneErr != nil && len(f.pruned) > 0 {
+		return contracts.History{}, f.afterPruneErr
+	}
+	if f.afterPrune != nil && len(f.pruned) > 0 {
+		return *f.afterPrune, nil
+	}
 	return f.history, nil
 }
 
@@ -147,7 +155,7 @@ func TestCompactPrunesWhatJevLetsGoAndStopsTheStack(t *testing.T) {
 	if !result.Done || result.TokensMeasured || result.Notice.Code != contracts.CodeCompacted {
 		t.Fatalf("result = %+v, want done, unmeasured, compacted", result)
 	}
-	if result.Note != "Jev pruned 2 tool calls, the history is 38% smaller" {
+	if !strings.HasPrefix(result.Note, "Jev reviewed 5 tool calls: 3 kept, 1 truncated, 1 removed, the history is 38% smaller") {
 		t.Fatalf("note = %q", result.Note)
 	}
 	wantAsked := []string{"call_t1", "call_t2", "call_t3", "call_t4", "result_t1", "result_t2", "result_t3", "result_t4"}
@@ -172,7 +180,7 @@ func TestCompactLetsTheNextStageRunWhenTheReductionFallsShort(t *testing.T) {
 	if result.Done {
 		t.Fatalf("result = %+v, want the stack to go on", result)
 	}
-	if result.Note != "Jev pruned 1 tool call, the history is 9% smaller, short of the 25% aimed for, so the next stage runs" {
+	if !strings.HasPrefix(result.Note, "Jev reviewed 5 tool calls: 3 kept, 1 truncated, 1 removed, the history is 9% smaller, short of the 25% aimed for, so the next stage runs") {
 		t.Fatalf("note = %q", result.Note)
 	}
 }
@@ -240,7 +248,7 @@ func TestCompactFallsBackToTheNextStageWhenJevFails(t *testing.T) {
 			if tc.tune != nil {
 				tc.tune(&stage.opts)
 			}
-			if _, err := stage.plan(t.Context(), sessionHistory(), ""); !errors.Is(err, tc.want) {
+			if _, err := stage.plan(t.Context(), sessionHistory(), contracts.CompactRequest{}, nil); !errors.Is(err, tc.want) {
 				t.Fatalf("plan error = %v, want %v", err, tc.want)
 			}
 			assertFallsBack(t, stage)
@@ -265,7 +273,7 @@ func assertFallsBack(t *testing.T, stage *compactor) {
 
 func TestJevRefusalNeverLeaksTheAPIKey(t *testing.T) {
 	stage := newTestCompactor(t, &fakeJev{status: http.StatusUnauthorized, echoAuth: true}, nil)
-	_, refusal := stage.client.ask(t.Context(), compactionState{}, nil)
+	refusal := stage.client.ask(t.Context(), compactionState{}, nil)
 	if !errors.Is(refusal, ErrJevRefused) || !strings.Contains(refusal.Error(), "Bearer "+redactedMarker) {
 		t.Fatalf("ask error = %v, want a refusal echoing the redacted header", refusal)
 	}
@@ -308,7 +316,7 @@ func TestAskAllReportsTheRefusalNotTheCancelledBatch(t *testing.T) {
 	})
 	stage := newTestCompactor(t, slowThenRefused, nil)
 	calls := collectCalls(sessionHistory(), 1)
-	_, err := stage.askAll(t.Context(), compactionState{}, [][]toolCall{{calls[0]}, {calls[1]}})
+	_, err := stage.askAll(t.Context(), compactionState{}, [][]toolCall{{calls[0]}, {calls[1]}}, newSpendLedger(0, 0))
 	if !errors.Is(err, ErrJevRefused) {
 		t.Fatalf("askAll error = %v, want ErrJevRefused", err)
 	}
@@ -347,5 +355,18 @@ func TestCompactSplitsTheQuestionsAcrossRequests(t *testing.T) {
 	}
 	if len(server.requests) < 2 || len(server.askedQuestions()) != 8 {
 		t.Fatalf("%d requests asking %v, want the 8 questions split", len(server.requests), server.askedQuestions())
+	}
+}
+
+func TestNoteSaysWhatStateJevWasGiven(t *testing.T) {
+	server := &fakeJev{answers: sessionAnswers()}
+	stage := newTestCompactor(t, server, nil)
+	editor := &fakeHistory{history: sessionHistory(), outcome: contracts.PruneOutcome{Edited: 2, CharsBefore: 1000, CharsAfter: 600}}
+	result, err := stage.Compact(t.Context(), contracts.CompactRequest{History: editor}, nil)
+	if err != nil {
+		t.Fatalf("Compact: %v", err)
+	}
+	if !strings.Contains(result.Note, "State read by Jev:") || !strings.Contains(result.Note, "fitted by inputs<=") {
+		t.Fatalf("note = %q, want the state tokens and the stage that fitted it", result.Note)
 	}
 }

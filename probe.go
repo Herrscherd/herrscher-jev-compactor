@@ -42,7 +42,7 @@ func (p prober) probe(ctx context.Context, access contracts.ProbeAccess) contrac
 	}
 	client := &jevClient{http: refusingClient(p.http, opts.timeout), endpoint: opts.endpoint, apiKey: opts.apiKey, model: opts.model}
 	started := time.Now()
-	_, err = client.ask(ctx, compactionState{History: []historyEntry{}}, make(map[string]question))
+	err = client.ask(ctx, compactionState{History: []historyEntry{}}, make(map[string]question))
 	return verdict(err, time.Since(started))
 }
 

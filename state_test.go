@@ -47,13 +47,18 @@ func TestFitStateSendsTheWholeHistoryWhenItFits(t *testing.T) {
 
 func TestFitStateShrinksStageByStageUntilItFits(t *testing.T) {
 	history := chattyHistory()
-	full, err := fitAt(t, history, defaultMaxStateTokens)
+	fit := func(maxTokens int) (fittedState, error) {
+		opts := testOptions(maxTokens)
+		opts.stateTextHead, opts.stateTextTail = 40, 20
+		return fitState(history, collectCalls(history, 1), "goal", opts)
+	}
+	full, err := fit(defaultMaxStateTokens)
 	if err != nil {
 		t.Fatal(err)
 	}
 	seen := make(map[string]bool)
-	for budget := full.tokens; budget > 0; budget -= 25 {
-		fitted, err := fitAt(t, history, budget)
+	for budget := full.tokens; budget > 0; budget-- {
+		fitted, err := fit(budget)
 		if errors.Is(err, ErrHistoryTooLarge) {
 			break
 		}

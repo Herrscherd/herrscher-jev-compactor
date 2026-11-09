@@ -46,6 +46,23 @@ func TestAbridgeKeepsHeadAndTail(t *testing.T) {
 	}
 }
 
+func TestAbridgeAddsNoNewlineForAnEmptyPart(t *testing.T) {
+	text := strings.Repeat("a", 10) + strings.Repeat("b", 100) + strings.Repeat("c", 10)
+	cases := map[string]struct {
+		head, tail int
+		want       string
+	}{
+		"no head":    {0, 10, "[… 110 chars omitted …]\ncccccccccc"},
+		"no tail":    {10, 0, "aaaaaaaaaa\n[… 110 chars omitted …]"},
+		"no context": {0, 0, "[… 120 chars omitted …]"},
+	}
+	for name, tc := range cases {
+		if got := abridge(text, tc.head, tc.tail); got != tc.want {
+			t.Errorf("%s: abridge = %q, want %q", name, got, tc.want)
+		}
+	}
+}
+
 func TestFlatInputKeepsKeyOrder(t *testing.T) {
 	cases := map[string]string{
 		`{"z":"last  word","a":{ "n": 1 }}`: `z=last word a={"a":{"n":1}}`,

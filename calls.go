@@ -11,11 +11,7 @@ import (
 	contracts "github.com/Herrscherd/herrscher-contracts"
 )
 
-const (
-	nestedInputRunes = 200
-	goalPrompts      = 3
-	goalPromptRunes  = 500
-)
+const nestedInputRunes = 200
 
 var errInputNotObject = errors.New("tool input is not a JSON object")
 
@@ -35,44 +31,27 @@ func (c toolCall) status() string {
 	return "ok"
 }
 
-func isPinned(index, total, preserveRecent int) bool {
-	return index == 0 || index >= total-preserveRecent
+func collectCalls(history contracts.History, preserveRecent int) []toolCall {
+	return collectCallsWith(history, preservation{first: true, recent: preserveRecent}, false)
 }
 
-func collectCalls(history contracts.History, preserveRecent int) []toolCall {
+func collectCallsWith(history contracts.History, keep preservation, includeEmpty bool) []toolCall {
 	var calls []toolCall
-	total := len(history.Messages)
+	pinned := keep.pinnedMessages(history.Messages)
 	for index := range history.Messages {
 		for _, call := range history.Messages[index].Calls {
-			if call.Result == "" {
+			if call.Result == "" && !includeEmpty {
 				continue
 			}
 			calls = append(calls, toolCall{
 				ref:     "t" + strconv.Itoa(len(calls)+1),
 				source:  call,
 				message: index,
-				pinned:  isPinned(index, total, preserveRecent),
+				pinned:  pinned[index],
 			})
 		}
 	}
 	return calls
-}
-
-func goalOf(history contracts.History, instruction string) string {
-	if instruction = strings.TrimSpace(instruction); instruction != "" {
-		return instruction
-	}
-	var prompts []string
-	for index := range history.Messages {
-		message := history.Messages[index]
-		if message.Role == contracts.RoleUser && strings.TrimSpace(message.Text) != "" {
-			prompts = append(prompts, truncate(message.Text, goalPromptRunes))
-		}
-	}
-	if len(prompts) > goalPrompts {
-		prompts = prompts[len(prompts)-goalPrompts:]
-	}
-	return strings.Join(prompts, "\n")
 }
 
 func compactCallLine(call toolCall, inputRunes int) string {

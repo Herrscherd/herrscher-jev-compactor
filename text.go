@@ -111,7 +111,15 @@ func abridge(text string, head, tail int) string {
 	if total <= head+tail+abridgeSlack {
 		return text
 	}
-	return fmt.Sprintf("%s\n[%s %d chars omitted %s]\n%s", runePrefix(text, head), ellipsis, total-head-tail, ellipsis, runeSuffix(text, tail))
+	var parts []string
+	if head > 0 {
+		parts = append(parts, runePrefix(text, head))
+	}
+	parts = append(parts, fmt.Sprintf("[%s %d chars omitted %s]", ellipsis, total-head-tail, ellipsis))
+	if tail > 0 {
+		parts = append(parts, runeSuffix(text, tail))
+	}
+	return strings.Join(parts, "\n")
 }
 
 func collapseSpaces(text string) string {

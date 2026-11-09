@@ -30,6 +30,11 @@
     "other": "characters kept at the head of a result Jev prunes"
   },
   {
+    "id": "jev.setting.truncate_tail",
+    "description": "Help of the truncate_tail setting",
+    "other": "characters kept at the tail of a result Jev prunes"
+  },
+  {
     "id": "jev.setting.min_reduction",
     "description": "Help of the min_reduction setting",
     "other": "share of the history from 0 to 1 the stage must remove to stop the compaction stack"
@@ -50,6 +55,182 @@
     "other": "timeout of one Jev request, as a Go duration"
   },
   {
+    "id": "jev.setting.max_parallel",
+    "description": "Help of the max_parallel setting",
+    "other": "number of Jev requests sent at once, at least 1"
+  },
+  {
+    "id": "jev.setting.on_short",
+    "description": "Help of the on_short setting",
+    "other": "keep leaves a short reduction to the next stage, done stops the stack there, revert leaves the history as it was when the reduction is short"
+  },
+  {
+    "id": "jev.setting.reduction_unit",
+    "description": "Help of the reduction_unit setting: the unit min_reduction is measured in",
+    "other": "unit min_reduction is measured in: characters, or tokens estimated without a tokenizer"
+  },
+  {
+    "id": "jev.setting.dry_run",
+    "description": "Help of the dry_run setting",
+    "other": "true computes what Jev would prune and changes nothing"
+  },
+  {
+    "id": "jev.setting.rules",
+    "description": "Help of the rules setting: per-tool actions, as motif[,motif]:action[,action] rules separated by semicolons",
+    "other": "per-tool rules as motif[,motif]:action[,action] separated by semicolons, first match wins, actions keep, prune, truncate, threshold=, call_threshold=, result_threshold=, head=, tail="
+  },
+  {
+    "id": "jev.setting.pin_inputs",
+    "description": "Help of the pin_inputs setting: substrings of a tool input whose calls are always kept",
+    "other": "comma-separated substrings: a tool call whose input contains one is always kept, without asking Jev"
+  },
+  {
+    "id": "jev.setting.keep_errors",
+    "description": "Help of the keep_errors setting",
+    "other": "true keeps the result of a failed tool call, so it is never pruned away with its call"
+  },
+  {
+    "id": "jev.setting.include_empty_results",
+    "description": "Help of the include_empty_results setting: whether tool calls with an empty result are judged by Jev too",
+    "other": "true also judges tool calls whose result is empty, which can include calls still running"
+  },
+  {
+    "id": "jev.setting.incremental",
+    "description": "Help of the incremental setting: whether the calls Jev kept in an earlier compaction of the session are asked about again",
+    "other": "true does not ask Jev again about the calls it kept in an earlier compaction of the session, until their content or the goal changes"
+  },
+  {
+    "id": "jev.setting.min_result_chars",
+    "description": "Help of the min_result_chars setting",
+    "other": "results shorter than this many characters are always kept, without asking Jev"
+  },
+  {
+    "id": "jev.setting.keep_call_threshold",
+    "description": "Help of the keep_call_threshold setting",
+    "other": "probability from 0 to 1 at or above which Jev keeps a call, defaults to keep_threshold"
+  },
+  {
+    "id": "jev.setting.keep_result_threshold",
+    "description": "Help of the keep_result_threshold setting",
+    "other": "probability from 0 to 1 at or above which Jev keeps the full result of a call, defaults to keep_threshold"
+  },
+  {
+    "id": "jev.setting.max_pruned",
+    "description": "Help of the max_pruned setting",
+    "other": "maximum number of tool calls one compaction edits, pruned or truncated, 0 for no limit"
+  },
+  {
+    "id": "jev.setting.max_removed_share",
+    "description": "Help of the max_removed_share setting",
+    "other": "maximum share from 0 to 1 of the history one compaction may remove, 1 for no limit"
+  },
+  {
+    "id": "jev.setting.state_input_runes",
+    "description": "Help of the state_input_runes setting: the three input cut levels of the state, full, short and line",
+    "other": "three levels of cut for tool inputs in the state Jev reads, in characters, longest first: full, short, line, separated by commas"
+  },
+  {
+    "id": "jev.setting.state_text_head",
+    "description": "Help of the state_text_head setting",
+    "other": "characters kept at the head of a long text of the state when it is abridged, 0 for none"
+  },
+  {
+    "id": "jev.setting.state_text_tail",
+    "description": "Help of the state_text_tail setting",
+    "other": "characters kept at the tail of a long text of the state when it is abridged, 0 for none"
+  },
+  {
+    "id": "jev.setting.state_context",
+    "description": "Help of the state_context setting: the context text Jev reads, replacing the built-in one when set",
+    "other": "context text Jev reads, replacing the built-in one when set"
+  },
+  {
+    "id": "jev.setting.state_stages",
+    "description": "Help of the state_stages setting: the ordered list of the state reduction stages allowed",
+    "other": "ordered list of the state reduction stages allowed, among abridge_texts, collapse_messages, compact_calls, leave_out, merge_calls"
+  },
+  {
+    "id": "jev.setting.goal_source",
+    "description": "Help of the goal_source setting: where the goal Jev reads comes from",
+    "other": "where the goal Jev reads comes from: auto takes the instruction then the last user prompts, prompts always the last user prompts, fixed always goal_text"
+  },
+  {
+    "id": "jev.setting.goal_text",
+    "description": "Help of the goal_text setting: the fixed goal Jev reads, required when goal_source is fixed",
+    "other": "goal Jev reads when goal_source is fixed, required then"
+  },
+  {
+    "id": "jev.setting.goal_prompts",
+    "description": "Help of the goal_prompts setting: how many of the last user prompts make the goal",
+    "other": "number of the last user prompts that make the goal, at least 1"
+  },
+  {
+    "id": "jev.setting.goal_prompt_runes",
+    "description": "Help of the goal_prompt_runes setting: characters kept of each user prompt in the goal",
+    "other": "characters kept of each user prompt in the goal, at least 1"
+  },
+  {
+    "id": "jev.setting.preserve_first",
+    "description": "Help of the preserve_first setting: whether the first message of the history is never pruned or abridged",
+    "other": "true keeps the first message of the history, the initial request, never pruned or abridged"
+  },
+  {
+    "id": "jev.setting.preserve_recent_tokens",
+    "description": "Help of the preserve_recent_tokens setting: token budget of the newest messages that are never pruned, 0 for none",
+    "other": "token budget of the newest messages whose tool calls are never pruned, 0 for none"
+  },
+  {
+    "id": "jev.setting.preserve_turns",
+    "description": "Help of the preserve_turns setting: number of the last user messages after which everything is never pruned, 0 for none",
+    "other": "everything after the Nth last user message is never pruned, 0 for none"
+  },
+  {
+    "id": "jev.setting.max_requests",
+    "description": "Help of the max_requests setting: the most requests sent to Jev for one compaction, retries included, 0 for no cap",
+    "other": "most requests sent to Jev for one compaction, retries included, 0 for no cap"
+  },
+  {
+    "id": "jev.setting.max_sent_tokens",
+    "description": "Help of the max_sent_tokens setting: the most tokens sent to Jev for one compaction, retries included and estimated, 0 for no cap",
+    "other": "most tokens sent to Jev for one compaction, retries included and estimated, 0 for no cap"
+  },
+  {
+    "id": "jev.setting.decision_log",
+    "description": "Help of the decision_log setting: the JSONL file where each decision on a tool call is appended, empty for none",
+    "other": "JSONL file where each decision on a tool call is appended, created with mode 0600, empty for none"
+  },
+  {
+    "id": "jev.setting.retries",
+    "description": "Help of the retries setting: how many times a request to Jev is sent again on a 429 or a 5xx answer, 0 for none",
+    "other": "times a Jev request is sent again after a 429 or a 5xx answer, at most 10, 0 for none"
+  },
+  {
+    "id": "jev.setting.retry_backoff",
+    "description": "Help of the retry_backoff setting: the first wait before a retry, as a Go duration, doubled at each retry",
+    "other": "first wait before a Jev request is sent again, as a Go duration, doubled at each retry, capped at 30s"
+  },
+  {
+    "id": "jev.note.spend_capped",
+    "description": "Appended to the note when the spend cap stopped the requests to Jev: Requests and Tokens are what was sent, the calls not judged stay in the history",
+    "other": "spend cap reached after {{.Requests}} requests and about {{.Tokens}} tokens sent to Jev, the calls not judged stay in the history"
+  },
+  {
+    "id": "jev.note.cache_hits",
+    "description": "Appended to the note when calls were kept from the incremental cache without asking Jev: Hits is how many",
+    "one": "{{.Count}} call kept from the cache, not asked again.",
+    "other": "{{.Count}} calls kept from the cache, not asked again."
+  },
+  {
+    "id": "jev.note.estimated",
+    "description": "Appended to the note when the reduction is estimated: the history could not be read after the prune, so the planned share is reported instead of the measured one",
+    "other": "The reduction is an estimate, the history could not be read again after the prune, so the planned share is reported"
+  },
+  {
+    "id": "jev.note.state",
+    "description": "Appended to the note with the state Jev was given: Tokens is its size in tokens, Stage the fitting stage that made it fit",
+    "other": "State read by Jev: {{.Tokens}} tokens, fitted by {{.Stage}}."
+  },
+  {
     "id": "jev.note.failed",
     "description": "The Jev stage failed for Reason, pruned nothing and lets the next stage of the stack compact",
     "other": "Jev pruned nothing, the next stage compacts: {{.Reason}}"
@@ -66,14 +247,41 @@
   },
   {
     "id": "jev.note.pruned",
-    "description": "The Jev stage pruned Count tool calls and shrank the history by Percent percent, enough to stop the stack",
-    "one": "Jev pruned {{.Count}} tool call, the history is {{.Percent}}% smaller",
-    "other": "Jev pruned {{.Count}} tool calls, the history is {{.Percent}}% smaller"
+    "description": "The Jev stage reviewed Count tool calls: Kept stay, Truncated keep only their head and tail, Pruned are removed, and the history shrank by Percent percent, enough to stop the stack",
+    "one": "Jev reviewed {{.Count}} tool call: {{.Kept}} kept, {{.Truncated}} truncated, {{.Pruned}} removed, the history is {{.Percent}}% smaller",
+    "other": "Jev reviewed {{.Count}} tool calls: {{.Kept}} kept, {{.Truncated}} truncated, {{.Pruned}} removed, the history is {{.Percent}}% smaller"
   },
   {
     "id": "jev.note.pruned_short",
-    "description": "The Jev stage pruned Count tool calls, but the Percent percent it removed is below its Target percent, so the next stage runs",
-    "one": "Jev pruned {{.Count}} tool call, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the next stage runs",
-    "other": "Jev pruned {{.Count}} tool calls, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the next stage runs"
+    "description": "The Jev stage reviewed Count tool calls and removed Percent percent of the history, below its Target percent, so the next stage runs",
+    "one": "Jev reviewed {{.Count}} tool call: {{.Kept}} kept, {{.Truncated}} truncated, {{.Pruned}} removed, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the next stage runs",
+    "other": "Jev reviewed {{.Count}} tool calls: {{.Kept}} kept, {{.Truncated}} truncated, {{.Pruned}} removed, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the next stage runs"
+  },
+  {
+    "id": "jev.note.pruned_stopped",
+    "description": "The Jev stage reviewed Count tool calls and removed Percent percent of the history, below its Target percent, and on_short=done stops the stack here",
+    "one": "Jev reviewed {{.Count}} tool call: {{.Kept}} kept, {{.Truncated}} truncated, {{.Pruned}} removed, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the stack stops here",
+    "other": "Jev reviewed {{.Count}} tool calls: {{.Kept}} kept, {{.Truncated}} truncated, {{.Pruned}} removed, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the stack stops here"
+  },
+  {
+    "id": "jev.note.reverted",
+    "description": "The Jev stage found the reduction of its plan short of the target, and on_short=revert leaves the history as it was for the next stage",
+    "other": "Jev would remove {{.Percent}}% of the history, short of the {{.Target}}% aimed for, so the history is left as it was and the next stage compacts it"
+  },
+  {
+    "id": "jev.note.out_of_reach",
+    "description": "The Jev stage found that pruning every candidate could not reach the target, so Jev was not asked and on_short=revert leaves the history as it was",
+    "other": "Even pruning every candidate would remove at most {{.Percent}}% of the history, short of the {{.Target}}% aimed for, so Jev was not asked and the history is left as it was"
+  },
+  {
+    "id": "jev.note.dry_run",
+    "description": "The Jev stage would prune Count tool calls, but dry_run is set so nothing changed",
+    "one": "Jev would prune {{.Count}} tool call, dry run: the history is unchanged",
+    "other": "Jev would prune {{.Count}} tool calls, dry run: the history is unchanged"
+  },
+  {
+    "id": "jev.error.state_above_request",
+    "description": "The max_state_tokens setting State is not below max_request_tokens Request, so the state would never fit the request",
+    "other": "max_state_tokens ({{.State}}) must stay below max_request_tokens ({{.Request}}), or the state never fits the request"
   }
 ]

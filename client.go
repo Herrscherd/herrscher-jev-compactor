@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -17,6 +18,9 @@ const (
 	maxResponseBytes = 8 << 20
 	errorBodyRunes   = 200
 	redactedMarker   = "[redacted]"
+	maxRetries       = 10
+	maxRetryDelay    = 30 * time.Second
+	backoffFactor    = 2
 )
 
 var (
@@ -35,8 +39,9 @@ var (
 )
 
 type statusError struct {
-	status int
-	body   string
+	status     int
+	body       string
+	retryAfter time.Duration
 }
 
 func (e *statusError) Error() string {
@@ -44,6 +49,10 @@ func (e *statusError) Error() string {
 }
 
 func (e *statusError) Unwrap() error { return ErrJevRefused }
+
+func (e *statusError) retryable() bool {
+	return e.status == http.StatusTooManyRequests || e.status >= http.StatusInternalServerError
+}
 
 type jevRequest struct {
 	Model     string              `json:"model"`
@@ -64,13 +73,98 @@ type jevClient struct {
 	endpoint string
 	apiKey   string
 	model    string
+	retries  int
+	backoff  time.Duration
+	now      func() time.Time
+	sleep    func(context.Context, time.Duration) error
 }
 
-func (c *jevClient) ask(ctx context.Context, state compactionState, questions map[string]question) (map[string]jevAnswer, error) {
-	body, err := encodeJSON(jevRequest{Model: c.model, State: state, Questions: questions})
+func (c *jevClient) ask(ctx context.Context, state compactionState, questions map[string]question) error {
+	body, err := c.body(state, questions)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	_, err = c.post(ctx, body, newSpendLedger(0, 0))
+	return err
+}
+
+func (c *jevClient) body(state compactionState, questions map[string]question) (string, error) {
+	return encodeJSON(jevRequest{Model: c.model, State: state, Questions: questions})
+}
+
+func (c *jevClient) post(ctx context.Context, body string, spend *spendLedger) (map[string]jevAnswer, error) {
+	tokens := estimateTokens(body)
+	for attempt := 0; ; attempt++ {
+		if err := spend.reserve(tokens); err != nil {
+			return nil, err
+		}
+		answers, err := c.send(ctx, body)
+		delay, retry := c.retryDelay(err, attempt)
+		if !retry {
+			return answers, err
+		}
+		slog.Debug("jev: request retried", "attempt", attempt+1, "delay", delay, "reason", failureReason(err))
+		if err := c.wait(ctx, delay); err != nil {
+			return nil, fmt.Errorf("jev: wait before retry: %w", err)
+		}
+	}
+}
+
+func (c *jevClient) retryDelay(err error, attempt int) (time.Duration, bool) {
+	var refused *statusError
+	if !errors.As(err, &refused) || !refused.retryable() || attempt >= c.retries {
+		return 0, false
+	}
+	if refused.retryAfter > maxRetryDelay {
+		return 0, false
+	}
+	return max(backoffDelay(c.backoff, attempt), refused.retryAfter), true
+}
+
+func (c *jevClient) wait(ctx context.Context, delay time.Duration) error {
+	if c.sleep == nil {
+		return sleepContext(ctx, delay)
+	}
+	return c.sleep(ctx, delay)
+}
+
+func (c *jevClient) clock() time.Time {
+	if c.now == nil {
+		return time.Now()
+	}
+	return c.now()
+}
+
+func backoffDelay(base time.Duration, attempt int) time.Duration {
+	delay := min(base, maxRetryDelay)
+	for range attempt {
+		delay = min(delay*backoffFactor, maxRetryDelay)
+	}
+	return delay
+}
+
+func parseRetryAfter(value string, now time.Time) time.Duration {
+	if seconds, err := strconv.ParseInt(strings.TrimSpace(value), 10, 32); err == nil {
+		return max(time.Duration(seconds)*time.Second, 0)
+	}
+	if when, err := http.ParseTime(value); err == nil {
+		return max(when.Sub(now), 0)
+	}
+	return 0
+}
+
+func sleepContext(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func (c *jevClient) send(ctx context.Context, body string) (map[string]jevAnswer, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewBufferString(body))
 	if err != nil {
 		return nil, fmt.Errorf("jev: build request: %w", err)
@@ -87,7 +181,11 @@ func (c *jevClient) ask(ctx context.Context, state compactionState, questions ma
 		return nil, fmt.Errorf("jev: read response: %w", err)
 	}
 	if response.StatusCode != http.StatusOK {
-		return nil, &statusError{status: response.StatusCode, body: truncate(c.redacted(string(payload)), errorBodyRunes)}
+		return nil, &statusError{
+			status:     response.StatusCode,
+			body:       truncate(c.redacted(string(payload)), errorBodyRunes),
+			retryAfter: parseRetryAfter(response.Header.Get("Retry-After"), c.clock()),
+		}
 	}
 	var decoded jevResponse
 	if err := json.Unmarshal(payload, &decoded); err != nil {

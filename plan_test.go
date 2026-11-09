@@ -2,6 +2,7 @@ package jev
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -29,11 +30,11 @@ func TestDecideFollowsTheThreshold(t *testing.T) {
 
 func TestEditForLeavesShortResultsAlone(t *testing.T) {
 	short := toolCall{source: contracts.HistoryCall{ID: "a", Result: strings.Repeat("x", 420)}}
-	if _, prune := editFor(short, decisionPruneResult, 300); prune {
+	if _, prune := editFor(short, decisionPruneResult, truncation{head: 300}); prune {
 		t.Fatal("a result within the slack of the head was pruned")
 	}
 	long := toolCall{source: contracts.HistoryCall{ID: "b", Result: strings.Repeat("x", 421)}}
-	edit, prune := editFor(long, decisionPruneResult, 300)
+	edit, prune := editFor(long, decisionPruneResult, truncation{head: 300})
 	if !prune || edit != (contracts.HistoryEdit{CallID: "b", Action: contracts.PruneResult, KeepChars: 300}) {
 		t.Fatalf("editFor = %+v, %v", edit, prune)
 	}
@@ -50,5 +51,26 @@ func TestBatchCallsRefusesAStateWithNoRoomLeft(t *testing.T) {
 	batches, err := batchCalls(calls, 0, defaultMaxRequestTokens)
 	if err != nil || len(batches) != 1 {
 		t.Fatalf("batchCalls = %v, %v, want one batch", batches, err)
+	}
+}
+
+func TestPruneCallCountsTheNoteThatReplacesTheResult(t *testing.T) {
+	call := toolCall{source: contracts.HistoryCall{ID: "a", Result: strings.Repeat("x", 500)}}
+	got := removalOf(call, contracts.HistoryEdit{CallID: "a", Action: contracts.PruneCall})
+	want := 500 - runeCount(prunedCallNote)
+	if got.runes != want {
+		t.Fatalf("removal runes = %d, want %d: the note the backend writes stays in the history", got.runes, want)
+	}
+}
+
+func TestPruneResultCountsTheNoteAndItsSeparator(t *testing.T) {
+	call := toolCall{source: contracts.HistoryCall{ID: "b", Result: strings.Repeat("x", 1000)}}
+	got := removalOf(call, contracts.HistoryEdit{CallID: "b", Action: contracts.PruneResult, KeepChars: 300})
+	inserted := "\n" + fmt.Sprintf(prunedResultNote, 700)
+	if want := 700 - runeCount(inserted); got.runes != want {
+		t.Fatalf("removal runes = %d, want %d", got.runes, want)
+	}
+	if want := estimateTokens(strings.Repeat("x", 700)) - estimateTokens(inserted); got.tokens != want {
+		t.Fatalf("removal tokens = %d, want %d", got.tokens, want)
 	}
 }

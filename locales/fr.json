@@ -30,6 +30,11 @@
     "other": "caractères gardés en tête d'un résultat que Jev élague"
   },
   {
+    "id": "jev.setting.truncate_tail",
+    "description": "Help of the truncate_tail setting",
+    "other": "caractères gardés en fin d'un résultat que Jev élague"
+  },
+  {
     "id": "jev.setting.min_reduction",
     "description": "Help of the min_reduction setting",
     "other": "part de l'historique de 0 à 1 que l'étape doit retirer pour arrêter la pile de compaction"
@@ -50,6 +55,182 @@
     "other": "délai d'une requête Jev, en durée Go"
   },
   {
+    "id": "jev.setting.max_parallel",
+    "description": "Help of the max_parallel setting",
+    "other": "nombre de requêtes Jev envoyées en même temps, au moins 1"
+  },
+  {
+    "id": "jev.setting.on_short",
+    "description": "Help of the on_short setting",
+    "other": "keep laisse une réduction insuffisante à l'étape suivante, done arrête la pile à cet endroit, revert laisse l'historique tel quel quand la réduction est insuffisante"
+  },
+  {
+    "id": "jev.setting.reduction_unit",
+    "description": "Help of the reduction_unit setting: the unit min_reduction is measured in",
+    "other": "unité dans laquelle min_reduction est mesuré : characters pour des caractères, ou tokens pour des jetons estimés sans tokenizer"
+  },
+  {
+    "id": "jev.setting.dry_run",
+    "description": "Help of the dry_run setting",
+    "other": "true calcule ce que Jev élaguerait sans rien modifier"
+  },
+  {
+    "id": "jev.setting.rules",
+    "description": "Help of the rules setting: per-tool actions, as motif[,motif]:action[,action] rules separated by semicolons",
+    "other": "règles par outil sous la forme motif[,motif]:action[,action], séparées par des points-virgules, la première qui correspond gagne, actions keep, prune, truncate, threshold=, call_threshold=, result_threshold=, head=, tail="
+  },
+  {
+    "id": "jev.setting.pin_inputs",
+    "description": "Help of the pin_inputs setting: substrings of a tool input whose calls are always kept",
+    "other": "sous-chaînes séparées par des virgules : un appel d'outil dont l'entrée en contient une est toujours gardé, sans demander à Jev"
+  },
+  {
+    "id": "jev.setting.keep_errors",
+    "description": "Help of the keep_errors setting",
+    "other": "true garde le résultat d'un appel d'outil en échec, pour qu'il ne soit pas élagué avec son appel"
+  },
+  {
+    "id": "jev.setting.include_empty_results",
+    "description": "Help of the include_empty_results setting: whether tool calls with an empty result are judged by Jev too",
+    "other": "true juge aussi les appels d'outil dont le résultat est vide, ce qui peut inclure des appels encore en cours"
+  },
+  {
+    "id": "jev.setting.incremental",
+    "description": "Help of the incremental setting: whether the calls Jev kept in an earlier compaction of the session are asked about again",
+    "other": "true ne réinterroge pas Jev sur les appels qu'il a gardés lors d'une compaction précédente de la session, jusqu'à ce que leur contenu ou l'objectif change"
+  },
+  {
+    "id": "jev.setting.min_result_chars",
+    "description": "Help of the min_result_chars setting",
+    "other": "les résultats plus courts que ce nombre de caractères sont toujours gardés, sans demander à Jev"
+  },
+  {
+    "id": "jev.setting.keep_call_threshold",
+    "description": "Help of the keep_call_threshold setting",
+    "other": "probabilité de 0 à 1 à partir de laquelle Jev garde un appel, vaut keep_threshold par défaut"
+  },
+  {
+    "id": "jev.setting.keep_result_threshold",
+    "description": "Help of the keep_result_threshold setting",
+    "other": "probabilité de 0 à 1 à partir de laquelle Jev garde le résultat complet d'un appel, vaut keep_threshold par défaut"
+  },
+  {
+    "id": "jev.setting.max_pruned",
+    "description": "Help of the max_pruned setting",
+    "other": "nombre maximal d'appels d'outil modifiés en une compaction, élagués ou tronqués, 0 pour sans limite"
+  },
+  {
+    "id": "jev.setting.max_removed_share",
+    "description": "Help of the max_removed_share setting",
+    "other": "part maximale de 0 à 1 de l'historique qu'une compaction peut retirer, 1 pour sans limite"
+  },
+  {
+    "id": "jev.setting.state_input_runes",
+    "description": "Help of the state_input_runes setting: the three input cut levels of the state, full, short and line",
+    "other": "trois paliers de coupe des entrées d'appel dans l'état envoyé à Jev, en caractères, du plus long au plus court : complet, court, ligne, séparés par des virgules"
+  },
+  {
+    "id": "jev.setting.state_text_head",
+    "description": "Help of the state_text_head setting",
+    "other": "caractères gardés en tête d'un long texte de l'état quand il est abrégé, 0 pour aucun"
+  },
+  {
+    "id": "jev.setting.state_text_tail",
+    "description": "Help of the state_text_tail setting",
+    "other": "caractères gardés en queue d'un long texte de l'état quand il est abrégé, 0 pour aucun"
+  },
+  {
+    "id": "jev.setting.state_context",
+    "description": "Help of the state_context setting: the context text Jev reads, replacing the built-in one when set",
+    "other": "texte de contexte lu par Jev, qui remplace le texte intégré quand il est renseigné"
+  },
+  {
+    "id": "jev.setting.state_stages",
+    "description": "Help of the state_stages setting: the ordered list of the state reduction stages allowed",
+    "other": "liste ordonnée des étapes de réduction de l'état autorisées, parmi abridge_texts, collapse_messages, compact_calls, leave_out, merge_calls"
+  },
+  {
+    "id": "jev.setting.goal_source",
+    "description": "Help of the goal_source setting: where the goal Jev reads comes from",
+    "other": "origine du but lu par Jev : auto prend l'instruction puis les derniers messages utilisateur, prompts prend toujours les derniers messages utilisateur, fixed prend toujours goal_text"
+  },
+  {
+    "id": "jev.setting.goal_text",
+    "description": "Help of the goal_text setting: the fixed goal Jev reads, required when goal_source is fixed",
+    "other": "but lu par Jev quand goal_source vaut fixed, obligatoire alors"
+  },
+  {
+    "id": "jev.setting.goal_prompts",
+    "description": "Help of the goal_prompts setting: how many of the last user prompts make the goal",
+    "other": "nombre des derniers messages utilisateur qui forment le but, au moins 1"
+  },
+  {
+    "id": "jev.setting.goal_prompt_runes",
+    "description": "Help of the goal_prompt_runes setting: characters kept of each user prompt in the goal",
+    "other": "caractères gardés de chaque message utilisateur dans le but, au moins 1"
+  },
+  {
+    "id": "jev.setting.preserve_first",
+    "description": "Help of the preserve_first setting: whether the first message of the history is never pruned or abridged",
+    "other": "true garde le premier message de l'historique, la demande initiale, sans l'élaguer ni l'abréger"
+  },
+  {
+    "id": "jev.setting.preserve_recent_tokens",
+    "description": "Help of the preserve_recent_tokens setting: token budget of the newest messages that are never pruned, 0 for none",
+    "other": "budget en tokens des messages les plus récents dont les appels d'outil ne sont jamais élagués, 0 pour aucun"
+  },
+  {
+    "id": "jev.setting.preserve_turns",
+    "description": "Help of the preserve_turns setting: number of the last user messages after which everything is never pruned, 0 for none",
+    "other": "tout ce qui suit le N-ième dernier message utilisateur n'est jamais élagué, 0 pour aucun"
+  },
+  {
+    "id": "jev.setting.max_requests",
+    "description": "Aide du réglage max_requests : le nombre maximal de requêtes envoyées à Jev pour une compaction, relances comprises, 0 pour aucun plafond",
+    "other": "nombre maximal de requêtes envoyées à Jev pour une compaction, relances comprises, 0 pour aucun plafond"
+  },
+  {
+    "id": "jev.setting.max_sent_tokens",
+    "description": "Aide du réglage max_sent_tokens : le nombre maximal de jetons envoyés à Jev pour une compaction, relances comprises et estimés, 0 pour aucun plafond",
+    "other": "nombre maximal de jetons envoyés à Jev pour une compaction, relances comprises et estimés, 0 pour aucun plafond"
+  },
+  {
+    "id": "jev.setting.decision_log",
+    "description": "Aide du réglage decision_log : le fichier JSONL où chaque décision sur un appel d'outil est ajoutée, vide pour aucun",
+    "other": "fichier JSONL où chaque décision sur un appel d'outil est ajoutée, créé en mode 0600, vide pour aucun"
+  },
+  {
+    "id": "jev.setting.retries",
+    "description": "Help of the retries setting: how many times a request to Jev is sent again on a 429 or a 5xx answer, 0 for none",
+    "other": "nombre de nouvelles tentatives d'une requête Jev après une réponse 429 ou 5xx, au plus 10, 0 pour aucune"
+  },
+  {
+    "id": "jev.setting.retry_backoff",
+    "description": "Help of the retry_backoff setting: the first wait before a retry, as a Go duration, doubled at each retry",
+    "other": "première attente avant une nouvelle tentative d'une requête Jev, en durée Go, doublée à chaque tentative, plafonnée à 30s"
+  },
+  {
+    "id": "jev.note.spend_capped",
+    "description": "Ajoutée à la note quand le plafond de dépense a arrêté les requêtes à Jev : Requests et Tokens sont ce qui a été envoyé, les appels non jugés restent dans l'historique",
+    "other": "plafond de dépense atteint après {{.Requests}} requêtes et environ {{.Tokens}} jetons envoyés à Jev, les appels non jugés restent dans l'historique"
+  },
+  {
+    "id": "jev.note.cache_hits",
+    "description": "Appended to the note when calls were kept from the incremental cache without asking Jev: Hits is how many",
+    "one": "{{.Count}} appel gardé depuis le cache, non réinterrogé.",
+    "other": "{{.Count}} appels gardés depuis le cache, non réinterrogés."
+  },
+  {
+    "id": "jev.note.estimated",
+    "description": "Ajoutée à la note quand la réduction est une estimation : l'historique n'a pas pu être relu après l'élagage, la part prévue est donnée à la place de la part mesurée",
+    "other": "Réduction estimée : l'historique n'a pas pu être relu après l'élagage, c'est la part prévue qui est donnée"
+  },
+  {
+    "id": "jev.note.state",
+    "description": "Ajoutée à la note avec l'état donné à Jev : Tokens est sa taille en jetons, Stage l'étape d'ajustement qui l'a fait tenir",
+    "other": "État lu par Jev : {{.Tokens}} jetons, ajusté par {{.Stage}}."
+  },
+  {
     "id": "jev.note.failed",
     "description": "The Jev stage failed for Reason, pruned nothing and lets the next stage of the stack compact",
     "other": "Jev n'a rien élagué, l'étape suivante compacte : {{.Reason}}"
@@ -66,14 +247,41 @@
   },
   {
     "id": "jev.note.pruned",
-    "description": "The Jev stage pruned Count tool calls and shrank the history by Percent percent, enough to stop the stack",
-    "one": "Jev a élagué {{.Count}} appel d'outil, l'historique est plus court de {{.Percent}} %",
-    "other": "Jev a élagué {{.Count}} appels d'outil, l'historique est plus court de {{.Percent}} %"
+    "description": "The Jev stage reviewed Count tool calls: Kept stay, Truncated keep only their head and tail, Pruned are removed, and the history shrank by Percent percent, enough to stop the stack",
+    "one": "Jev a examiné {{.Count}} appel d'outil : {{.Kept}} gardé, {{.Truncated}} tronqué, {{.Pruned}} supprimé, l'historique est plus court de {{.Percent}} %",
+    "other": "Jev a examiné {{.Count}} appels d'outil : {{.Kept}} gardés, {{.Truncated}} tronqués, {{.Pruned}} supprimés, l'historique est plus court de {{.Percent}} %"
   },
   {
     "id": "jev.note.pruned_short",
-    "description": "The Jev stage pruned Count tool calls, but the Percent percent it removed is below its Target percent, so the next stage runs",
-    "one": "Jev a élagué {{.Count}} appel d'outil, l'historique est plus court de {{.Percent}} %, sous les {{.Target}} % visés, donc l'étape suivante s'exécute",
-    "other": "Jev a élagué {{.Count}} appels d'outil, l'historique est plus court de {{.Percent}} %, sous les {{.Target}} % visés, donc l'étape suivante s'exécute"
+    "description": "The Jev stage reviewed Count tool calls and removed Percent percent of the history, below its Target percent, so the next stage runs",
+    "one": "Jev a examiné {{.Count}} appel d'outil : {{.Kept}} gardé, {{.Truncated}} tronqué, {{.Pruned}} supprimé, l'historique est plus court de {{.Percent}} %, sous les {{.Target}} % visés, donc l'étape suivante s'exécute",
+    "other": "Jev a examiné {{.Count}} appels d'outil : {{.Kept}} gardés, {{.Truncated}} tronqués, {{.Pruned}} supprimés, l'historique est plus court de {{.Percent}} %, sous les {{.Target}} % visés, donc l'étape suivante s'exécute"
+  },
+  {
+    "id": "jev.note.pruned_stopped",
+    "description": "The Jev stage reviewed Count tool calls and removed Percent percent of the history, below its Target percent, and on_short=done stops the stack here",
+    "one": "Jev a examiné {{.Count}} appel d'outil : {{.Kept}} gardé, {{.Truncated}} tronqué, {{.Pruned}} supprimé, l'historique est plus court de {{.Percent}} %, sous les {{.Target}} % visés, la pile s'arrête ici",
+    "other": "Jev a examiné {{.Count}} appels d'outil : {{.Kept}} gardés, {{.Truncated}} tronqués, {{.Pruned}} supprimés, l'historique est plus court de {{.Percent}} %, sous les {{.Target}} % visés, la pile s'arrête ici"
+  },
+  {
+    "id": "jev.note.reverted",
+    "description": "The Jev stage found the reduction of its plan short of the target, and on_short=revert leaves the history as it was for the next stage",
+    "other": "Jev retirerait {{.Percent}} % de l'historique, sous les {{.Target}} % visés : l'historique reste tel quel et l'étape suivante compacte"
+  },
+  {
+    "id": "jev.note.out_of_reach",
+    "description": "The Jev stage found that pruning every candidate could not reach the target, so Jev was not asked and on_short=revert leaves the history as it was",
+    "other": "Même en élaguant tous les candidats, Jev retirerait au plus {{.Percent}} % de l'historique, sous les {{.Target}} % visés : Jev n'a pas été interrogé et l'historique reste tel quel"
+  },
+  {
+    "id": "jev.note.dry_run",
+    "description": "The Jev stage would prune Count tool calls, but dry_run is set so nothing changed",
+    "one": "Jev élaguerait {{.Count}} appel d'outil, essai à blanc : l'historique reste inchangé",
+    "other": "Jev élaguerait {{.Count}} appels d'outil, essai à blanc : l'historique reste inchangé"
+  },
+  {
+    "id": "jev.error.state_above_request",
+    "description": "The max_state_tokens setting State is not below max_request_tokens Request, so the state would never fit the request",
+    "other": "max_state_tokens ({{.State}}) doit rester inférieur à max_request_tokens ({{.Request}}), sinon l'état ne tient jamais dans la requête"
   }
 ]
