@@ -16,6 +16,7 @@ import (
 const (
 	percent          = 100
 	questionsPerCall = 2
+	countParam       = "Count"
 )
 
 var (
@@ -51,6 +52,7 @@ type compactor struct {
 	opts   options
 	client *jevClient
 	texts  *messages
+	cache  *keepCache
 }
 
 func newCompactor(cfg contracts.PluginConfig, texts *messages, httpClient *http.Client) (*compactor, error) {
@@ -58,8 +60,13 @@ func newCompactor(cfg contracts.PluginConfig, texts *messages, httpClient *http.
 	if err != nil {
 		return nil, err
 	}
+	var cache *keepCache
+	if opts.incremental {
+		cache = newKeepCache()
+	}
 	return &compactor{
-		opts: opts,
+		opts:  opts,
+		cache: cache,
 		client: &jevClient{
 			http:     refusingClient(httpClient, opts.timeout),
 			endpoint: opts.endpoint,
@@ -87,7 +94,7 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 	run.chars(before, before)
 	journal := openDecisionLog(c.opts.decisionLog)
 	defer journal.close()
-	report, err := c.plan(ctx, history, req.Instruction, journal)
+	report, err := c.plan(ctx, history, req, journal)
 	run.examine(report)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -102,11 +109,11 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 		if report.capped {
 			return run.finish(contracts.CompactResult{Note: c.texts.english(noteSpendCapped, spendParams(report))}, contracts.CompactSkipped), nil
 		}
-		return run.finish(contracts.CompactResult{Note: c.texts.english(noteNothingToPrune, nil)}, contracts.CompactSkipped), nil
+		return run.finish(contracts.CompactResult{Note: c.noteWith(report, noteNothingToPrune, nil)}, contracts.CompactSkipped), nil
 	}
 	if c.opts.dryRun {
 		run.reduce(report, before, before-report.removed.runes)
-		note := c.noteWith(report, noteDryRun, map[string]any{"Count": len(report.edits)})
+		note := c.noteWith(report, noteDryRun, map[string]any{countParam: len(report.edits)})
 		return run.finish(contracts.CompactResult{Note: note}, contracts.CompactDryRun), nil
 	}
 	if c.opts.revertsShort() {
@@ -136,6 +143,9 @@ func (c *compactor) reverted(run *compactRun, report planReport, key string, red
 
 func (c *compactor) noteWith(report planReport, key string, params map[string]any) string {
 	note := c.texts.english(key, params)
+	if report.cached > 0 {
+		note += ". " + c.texts.english(noteCacheHits, map[string]any{countParam: report.cached})
+	}
 	if !report.capped {
 		return note
 	}
@@ -165,11 +175,11 @@ func textRunes(history contracts.History) int {
 
 func (c *compactor) result(run *compactRun, report planReport, outcome contracts.PruneOutcome, reduction float64) contracts.CompactResult {
 	if outcome.Edited == 0 {
-		return run.finish(contracts.CompactResult{Note: c.texts.english(noteNothingToPrune, nil)}, contracts.CompactSkipped)
+		return run.finish(contracts.CompactResult{Note: c.noteWith(report, noteNothingToPrune, nil)}, contracts.CompactSkipped)
 	}
 	run.reduce(report, outcome.CharsBefore, outcome.CharsAfter)
 	params := map[string]any{
-		"Count":     run.stats.Calls,
+		countParam:  run.stats.Calls,
 		"Kept":      run.kept(),
 		"Truncated": run.stats.Truncated,
 		"Pruned":    run.stats.Pruned,

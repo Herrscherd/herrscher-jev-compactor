@@ -95,6 +95,11 @@
     "other": "true also judges tool calls whose result is empty, which can include calls still running"
   },
   {
+    "id": "jev.setting.incremental",
+    "description": "Help of the incremental setting: whether the calls Jev kept in an earlier compaction of the session are asked about again",
+    "other": "true does not ask Jev again about the calls it kept in an earlier compaction of the session, until their content or the goal changes"
+  },
+  {
     "id": "jev.setting.min_result_chars",
     "description": "Help of the min_result_chars setting",
     "other": "results shorter than this many characters are always kept, without asking Jev"
@@ -208,6 +213,12 @@
     "id": "jev.note.spend_capped",
     "description": "Appended to the note when the spend cap stopped the requests to Jev: Requests and Tokens are what was sent, the calls not judged stay in the history",
     "other": "spend cap reached after {{.Requests}} requests and about {{.Tokens}} tokens sent to Jev, the calls not judged stay in the history"
+  },
+  {
+    "id": "jev.note.cache_hits",
+    "description": "Appended to the note when calls were kept from the incremental cache without asking Jev: Hits is how many",
+    "one": "{{.Count}} call kept from the cache, not asked again.",
+    "other": "{{.Count}} calls kept from the cache, not asked again."
   },
   {
     "id": "jev.note.failed",

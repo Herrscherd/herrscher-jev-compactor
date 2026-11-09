@@ -11,7 +11,7 @@ func planWith(t *testing.T, history contracts.History, settings map[string]strin
 	t.Helper()
 	server := &fakeJev{answers: sessionAnswers()}
 	stage := newTestCompactor(t, server, settings)
-	report, err := stage.plan(t.Context(), history, "", nil)
+	report, err := stage.plan(t.Context(), history, contracts.CompactRequest{}, nil)
 	if err != nil {
 		t.Fatalf("plan: %v", err)
 	}

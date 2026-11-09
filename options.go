@@ -54,6 +54,7 @@ const (
 	settingMaxRequests          = "max_requests"
 	settingMaxSent              = "max_sent_tokens"
 	settingDecisionLog          = "decision_log"
+	settingIncremental          = "incremental"
 )
 
 const (
@@ -72,6 +73,7 @@ const (
 	defaultOnShort          = onShortKeep
 	defaultKeepErrors       = false
 	defaultIncludeEmpty     = false
+	defaultIncremental      = false
 	defaultMinResultChars   = 0
 	defaultMaxPruned        = 0
 	defaultFullInputRunes   = 1000
@@ -197,6 +199,7 @@ type options struct {
 	policy               *callPolicy
 	keepErrors           bool
 	includeEmpty         bool
+	incremental          bool
 	minResultChars       int
 	maxPruned            int
 	maxRemovedShare      float64
@@ -316,6 +319,7 @@ func settings(texts *messages) []contracts.Setting {
 		{Key: settingPinInputs, Env: "JEV_PIN_INPUTS", Help: texts.english(helpPinInputs, nil)},
 		{Key: settingKeepErrors, Env: "JEV_KEEP_ERRORS", Help: texts.english(helpKeepErrors, nil), Default: strconv.FormatBool(defaultKeepErrors)},
 		{Key: settingIncludeEmpty, Env: "JEV_INCLUDE_EMPTY_RESULTS", Help: texts.english(helpIncludeEmpty, nil), Default: strconv.FormatBool(defaultIncludeEmpty)},
+		{Key: settingIncremental, Env: "JEV_INCREMENTAL", Help: texts.english(helpIncremental, nil), Default: strconv.FormatBool(defaultIncremental)},
 		{Key: settingMinResultChars, Env: "JEV_MIN_RESULT_CHARS", Help: texts.english(helpMinResultChars, nil), Default: strconv.Itoa(defaultMinResultChars)},
 		{Key: settingMaxPruned, Env: "JEV_MAX_PRUNED", Help: texts.english(helpMaxPruned, nil), Default: strconv.Itoa(defaultMaxPruned)},
 		{Key: settingMaxRemovedShare, Env: "JEV_MAX_REMOVED_SHARE", Help: texts.english(helpMaxRemovedShare, nil), Default: strconv.FormatFloat(fullShare, 'g', -1, 64)},
@@ -366,6 +370,7 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 		policy:               read.policy(),
 		keepErrors:           read.flag(settingKeepErrors),
 		includeEmpty:         read.flag(settingIncludeEmpty),
+		incremental:          read.flag(settingIncremental),
 		minResultChars:       read.count(settingMinResultChars, defaultMinResultChars, 0),
 		maxPruned:            read.count(settingMaxPruned, defaultMaxPruned, 0),
 		maxRemovedShare:      read.share(settingMaxRemovedShare),

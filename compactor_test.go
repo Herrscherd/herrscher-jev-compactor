@@ -240,7 +240,7 @@ func TestCompactFallsBackToTheNextStageWhenJevFails(t *testing.T) {
 			if tc.tune != nil {
 				tc.tune(&stage.opts)
 			}
-			if _, err := stage.plan(t.Context(), sessionHistory(), "", nil); !errors.Is(err, tc.want) {
+			if _, err := stage.plan(t.Context(), sessionHistory(), contracts.CompactRequest{}, nil); !errors.Is(err, tc.want) {
 				t.Fatalf("plan error = %v, want %v", err, tc.want)
 			}
 			assertFallsBack(t, stage)

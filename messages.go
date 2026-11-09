@@ -55,6 +55,7 @@ const (
 	helpMaxRequests          = "jev.setting.max_requests"
 	helpMaxSent              = "jev.setting.max_sent_tokens"
 	helpDecisionLog          = "jev.setting.decision_log"
+	helpIncremental          = "jev.setting.incremental"
 	noteFailed               = "jev.note.failed"
 	noteNoHistory            = "jev.note.no_history"
 	noteNothingToPrune       = "jev.note.nothing_to_prune"
@@ -65,6 +66,7 @@ const (
 	noteOutOfReach           = "jev.note.out_of_reach"
 	noteDryRun               = "jev.note.dry_run"
 	noteSpendCapped          = "jev.note.spend_capped"
+	noteCacheHits            = "jev.note.cache_hits"
 )
 
 type messages struct {
