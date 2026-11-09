@@ -23,16 +23,18 @@ func (e exit) code() int {
 }
 
 func exitOf(err error) exit {
-	switch {
-	case err == nil:
+	if err == nil {
 		return exitSuccess
-	case errors.Is(err, errUsage):
+	}
+	if _, ok := errors.AsType[usageError](err); ok {
 		return exitUsage
+	}
+	switch {
 	case errors.Is(err, jev.ErrInvalidSnapshot):
 		return exitDataError
-	case errors.Is(err, jev.ErrInvalidSetting), errors.Is(err, errSettingsLine):
+	case errors.Is(err, jev.ErrInvalidSetting), errors.Is(err, errSettingsLine), errors.Is(err, errSettingsTooLarge):
 		return exitConfig
-	case errors.Is(err, fs.ErrNotExist):
+	case errors.Is(err, fs.ErrNotExist), errors.Is(err, errNotRegular):
 		return exitNoInput
 	default:
 		return exitIOError

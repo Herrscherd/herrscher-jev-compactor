@@ -104,17 +104,15 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 		}
 		return run.finish(c.fallback(err), contracts.CompactFailed), nil
 	}
-	if report.outOfReach {
-		return c.reverted(run, report, noteOutOfReach, report.ceiling), nil
-	}
-	if len(report.edits) == 0 {
-		if report.capped {
-			return run.finish(contracts.CompactResult{Note: c.texts.english(noteSpendCapped, spendParams(report))}, contracts.CompactSkipped), nil
-		}
-		return run.finish(contracts.CompactResult{Note: c.noteWith(report, noteNothingToPrune, nil)}, contracts.CompactSkipped), nil
-	}
-	if planned, short := c.shortOfTarget(report, history); short {
-		return c.reverted(run, report, noteReverted, planned), nil
+	decision := c.verdictOf(report, history)
+	switch decision.verdict {
+	case planOutOfReach:
+		return c.reverted(run, report, noteOutOfReach, decision.share), nil
+	case planNothing:
+		return c.nothingToPrune(run, report), nil
+	case planShort:
+		return c.reverted(run, report, noteReverted, decision.share), nil
+	case planApply:
 	}
 	if c.opts.dryRun {
 		run.reduce(report, before, before-report.removed.runes)
@@ -127,6 +125,41 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 	}
 	reduction, estimated := c.reductionMeasured(ctx, req.History, outcome, history, report)
 	return c.result(run, report, outcome, reduction, estimated), nil
+}
+
+type planVerdict uint8
+
+const (
+	planApply planVerdict = iota
+	planNothing
+	planShort
+	planOutOfReach
+)
+
+type planDecision struct {
+	verdict planVerdict
+	share   float64
+}
+
+func (c *compactor) verdictOf(report planReport, history contracts.History) planDecision {
+	if report.outOfReach {
+		return planDecision{verdict: planOutOfReach, share: report.ceiling}
+	}
+	if len(report.edits) == 0 {
+		return planDecision{verdict: planNothing}
+	}
+	planned, short := c.shortOfTarget(report, history)
+	if short {
+		return planDecision{verdict: planShort, share: planned}
+	}
+	return planDecision{verdict: planApply, share: planned}
+}
+
+func (c *compactor) nothingToPrune(run *compactRun, report planReport) contracts.CompactResult {
+	if report.capped {
+		return run.finish(contracts.CompactResult{Note: c.texts.english(noteSpendCapped, spendParams(report))}, contracts.CompactSkipped)
+	}
+	return run.finish(contracts.CompactResult{Note: c.noteWith(report, noteNothingToPrune, nil)}, contracts.CompactSkipped)
 }
 
 func (c *compactor) reductionMeasured(ctx context.Context, editor contracts.HistoryEditor, outcome contracts.PruneOutcome, history contracts.History, report planReport) (float64, bool) {

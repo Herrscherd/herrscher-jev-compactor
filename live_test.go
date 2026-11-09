@@ -1,3 +1,5 @@
+//go:build live
+
 package jev
 
 import (
@@ -48,6 +50,15 @@ func applyEdit(call *contracts.HistoryCall, edit contracts.HistoryEdit) {
 	if edit.KeepChars < len(runes) {
 		call.Result = string(runes[:edit.KeepChars])
 	}
+}
+
+func fixtureHistory(t *testing.T) contracts.History {
+	t.Helper()
+	history, err := fixtureSnapshot(t).History.history()
+	if err != nil {
+		t.Fatalf("fixture history: %v", err)
+	}
+	return history
 }
 
 func TestLiveJevAnswersTheSessionHistory(t *testing.T) {

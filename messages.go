@@ -81,6 +81,12 @@ func newMessages() *messages {
 	return &messages{load: sync.OnceValues(loadCatalog)}
 }
 
+// Catalog returns the message catalog of the module in every language it
+// translates into. The jev-bench command renders its own text from it.
+func Catalog() (*i18n.Catalog, error) {
+	return loadCatalog()
+}
+
 func loadCatalog() (*i18n.Catalog, error) {
 	sources, err := fs.Sub(localeFiles, "locales")
 	if err != nil {

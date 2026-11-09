@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"os"
 	"path/filepath"
@@ -15,7 +16,39 @@ import (
 
 const recordedName = "recorded"
 
-var errSettingsLine = errors.New("settings line is not key=value")
+const maxSettingsBytes = 64 << 10
+
+var (
+	errSettingsLine     = errors.New("settings line is not key=value")
+	errSettingsTooLarge = errors.New("settings file is larger than 64 KiB")
+	errNotRegular       = errors.New("not a regular file")
+)
+
+type lineError struct {
+	path string
+	line int
+}
+
+func (e lineError) Error() string {
+	return fmt.Sprintf("%s:%d: %v", e.path, e.line, errSettingsLine)
+}
+
+func (e lineError) Unwrap() error {
+	return errSettingsLine
+}
+
+type fileError struct {
+	path string
+	kind error
+}
+
+func (e fileError) Error() string {
+	return e.path + ": " + e.kind.Error()
+}
+
+func (e fileError) Unwrap() error {
+	return e.kind
+}
 
 type comparison struct {
 	Snapshots int       `json:"snapshots"`
@@ -28,6 +61,7 @@ type summary struct {
 	Truncated       int     `json:"truncated"`
 	Pruned          int     `json:"pruned"`
 	Unanswered      int     `json:"unanswered"`
+	Cached          int     `json:"cached"`
 	Reverted        int     `json:"reverted"`
 	CharsReduction  float64 `json:"chars_reduction"`
 	TokensReduction float64 `json:"tokens_reduction"`
@@ -44,6 +78,7 @@ type tally struct {
 	truncated     int
 	pruned        int
 	unanswered    int
+	cached        int
 	reverted      int
 	charsBefore   int
 	charsRemoved  int
@@ -73,8 +108,8 @@ func compare(snapshotPaths, settingsPaths []string) (comparison, error) {
 
 func (c column) replay(snapshots []jev.Snapshot) (tally, error) {
 	total := tally{name: c.name}
-	for _, snapshot := range snapshots {
-		replayed, err := jev.Replay(snapshot, contracts.PluginConfig{Settings: c.settingsFor(snapshot)})
+	for index := range snapshots {
+		replayed, err := jev.Replay(snapshots[index], contracts.PluginConfig{Settings: c.settingsFor(snapshots[index])})
 		if err != nil {
 			return tally{}, fmt.Errorf("%s: %w", c.name, err)
 		}
@@ -95,6 +130,7 @@ func (t tally) add(replayed jev.Replayed) tally {
 	t.truncated += replayed.Truncated
 	t.pruned += replayed.Pruned
 	t.unanswered += replayed.Unanswered
+	t.cached += replayed.Cached
 	t.charsBefore += replayed.CharsBefore
 	t.charsRemoved += replayed.CharsRemoved
 	t.tokensBefore += replayed.TokensBefore
@@ -112,6 +148,7 @@ func (t tally) summary() summary {
 		Truncated:       t.truncated,
 		Pruned:          t.pruned,
 		Unanswered:      t.unanswered,
+		Cached:          t.cached,
 		Reverted:        t.reverted,
 		CharsReduction:  shareOf(t.charsRemoved, t.charsBefore),
 		TokensReduction: shareOf(t.tokensRemoved, t.tokensBefore),
@@ -138,15 +175,31 @@ func readSnapshots(paths []string) ([]jev.Snapshot, error) {
 }
 
 func readSnapshot(path string) (jev.Snapshot, error) {
-	file, err := os.Open(filepath.Clean(path))
+	file, err := openRegular(path)
 	if err != nil {
 		return jev.Snapshot{}, err
 	}
 	snapshot, decodeErr := jev.DecodeSnapshot(file)
 	if joined := errors.Join(decodeErr, file.Close()); joined != nil {
-		return jev.Snapshot{}, fmt.Errorf("%s: %w", path, joined)
+		return jev.Snapshot{}, fileError{path: path, kind: joined}
 	}
 	return snapshot, nil
+}
+
+func openRegular(path string) (*os.File, error) {
+	clean := filepath.Clean(path)
+	info, err := os.Stat(clean)
+	if err != nil {
+		return nil, fileError{path: path, kind: err}
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fileError{path: path, kind: errNotRegular}
+	}
+	file, err := os.Open(clean)
+	if err != nil {
+		return nil, fileError{path: path, kind: err}
+	}
+	return file, nil
 }
 
 func readColumns(paths []string) ([]column, error) {
@@ -163,12 +216,23 @@ func readColumns(paths []string) ([]column, error) {
 }
 
 func readSettings(path string) (map[string]string, error) {
-	data, err := os.ReadFile(filepath.Clean(path))
+	file, err := openRegular(path)
 	if err != nil {
 		return nil, err
 	}
+	data, readErr := io.ReadAll(io.LimitReader(file, maxSettingsBytes+1))
+	if joined := errors.Join(readErr, file.Close()); joined != nil {
+		return nil, fileError{path: path, kind: joined}
+	}
+	if len(data) > maxSettingsBytes {
+		return nil, fileError{path: path, kind: errSettingsTooLarge}
+	}
+	return parseSettings(path, string(data))
+}
+
+func parseSettings(path, text string) (map[string]string, error) {
 	settings := make(map[string]string)
-	for _, line := range strings.Split(string(data), "\n") {
+	for number, line := range strings.Split(text, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -176,7 +240,7 @@ func readSettings(path string) (map[string]string, error) {
 		key, value, found := strings.Cut(line, "=")
 		key = strings.TrimSpace(key)
 		if !found || key == "" {
-			return nil, fmt.Errorf("%w: %s: %q", errSettingsLine, path, line)
+			return nil, lineError{path: path, line: number + 1}
 		}
 		settings[key] = strings.TrimSpace(value)
 	}

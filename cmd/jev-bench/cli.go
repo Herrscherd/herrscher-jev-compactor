@@ -5,47 +5,77 @@ import (
 	"flag"
 	"fmt"
 	"io"
+
+	"github.com/Herrscherd/herrscher-contracts/i18n"
+
+	jev "github.com/Herrscherd/herrscher-jev-compactor"
 )
 
-var errUsage = errors.New("jev-bench usage: [-json] [-settings file] snapshot")
+var errNoSnapshot = errors.New("at least one snapshot file is needed")
+
+type usageError struct {
+	cause error
+}
+
+func (e usageError) Error() string {
+	return e.cause.Error()
+}
+
+func (e usageError) Unwrap() error {
+	return e.cause
+}
 
 type options struct {
 	json      bool
+	lang      i18n.Language
 	snapshots []string
 	settings  []string
 }
 
 func execute(args []string, stdout, stderr io.Writer) exit {
-	opts, err := parseArgs(args, stderr)
+	catalog, err := jev.Catalog()
+	if err != nil {
+		if _, reportErr := fmt.Fprintf(stderr, "jev-bench: %v\n", err); reportErr != nil {
+			return exitIOError
+		}
+		return exitIOError
+	}
+	opts, err := parseArgs(args)
+	out := output{stdout: stdout, stderr: stderr, texts: catalog, lang: opts.lang}
 	if errors.Is(err, flag.ErrHelp) {
+		if usageErr := out.usage(); usageErr != nil {
+			return out.fail(usageErr)
+		}
 		return exitSuccess
 	}
 	if err != nil {
-		return fail(stderr, err)
+		return out.fail(err)
 	}
 	result, err := compare(opts.snapshots, opts.settings)
 	if err != nil {
-		return fail(stderr, err)
+		return out.fail(err)
 	}
-	if writeErr := write(stdout, result, opts.json); writeErr != nil {
-		return fail(stderr, writeErr)
+	if err := out.write(result, opts.json); err != nil {
+		return out.fail(err)
 	}
 	return exitSuccess
 }
 
-func fail(stderr io.Writer, err error) exit {
-	if reportErr := report(stderr, err); reportErr != nil {
-		return exitIOError
-	}
-	return exitOf(err)
-}
-
-func parseArgs(args []string, stderr io.Writer) (options, error) {
-	var opts options
+func parseArgs(args []string) (options, error) {
+	opts := options{lang: i18n.English}
 	flags := flag.NewFlagSet("jev-bench", flag.ContinueOnError)
-	flags.SetOutput(stderr)
-	flags.BoolVar(&opts.json, "json", false, "print the comparison as JSON")
-	flags.Func("settings", "settings file of key=value lines laid over the recorded settings, repeatable", func(path string) error {
+	flags.SetOutput(io.Discard)
+	flags.Usage = func() {}
+	flags.BoolVar(&opts.json, "json", false, "")
+	flags.Func("lang", "", func(value string) error {
+		lang, err := i18n.ParseLanguage(value)
+		if err != nil {
+			return err
+		}
+		opts.lang = lang
+		return nil
+	})
+	flags.Func("settings", "", func(path string) error {
 		opts.settings = append(opts.settings, path)
 		return nil
 	})
@@ -53,9 +83,9 @@ func parseArgs(args []string, stderr io.Writer) (options, error) {
 	for {
 		if err := flags.Parse(rest); err != nil {
 			if errors.Is(err, flag.ErrHelp) {
-				return options{}, err
+				return opts, err
 			}
-			return options{}, fmt.Errorf("%w: %w", errUsage, err)
+			return opts, usageError{cause: err}
 		}
 		if flags.NArg() == 0 {
 			break
@@ -64,7 +94,7 @@ func parseArgs(args []string, stderr io.Writer) (options, error) {
 		rest = flags.Args()[1:]
 	}
 	if len(opts.snapshots) == 0 {
-		return options{}, fmt.Errorf("%w: at least one snapshot file", errUsage)
+		return opts, usageError{cause: errNoSnapshot}
 	}
 	return opts, nil
 }

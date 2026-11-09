@@ -2,7 +2,9 @@ package jev
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -27,15 +29,6 @@ func fixtureSnapshot(t *testing.T) Snapshot {
 		t.Fatalf("DecodeSnapshot: %v", err)
 	}
 	return snapshot
-}
-
-func fixtureHistory(t *testing.T) contracts.History {
-	t.Helper()
-	history, err := fixtureSnapshot(t).History.history()
-	if err != nil {
-		t.Fatalf("fixture history: %v", err)
-	}
-	return history
 }
 
 func onlyEntry(t *testing.T, dir string) os.DirEntry {
@@ -73,7 +66,7 @@ func onlySnapshotInfo(t *testing.T, dir string) os.FileInfo {
 }
 
 func TestReplayPlansWhatTheCompactionDid(t *testing.T) {
-	dir := t.TempDir()
+	dir := filepath.Join(t.TempDir(), "snapshots")
 	server := &fakeJev{answers: sessionAnswers()}
 	stage := newTestCompactor(t, server, map[string]string{settingReplayDir: dir})
 	editor := &fakeHistory{history: sessionHistory(), outcome: contracts.PruneOutcome{Edited: 2, CharsBefore: 1000, CharsAfter: 600}}
@@ -135,7 +128,9 @@ func TestReplayKeepsAndCountsTheCallsJevNeverJudged(t *testing.T) {
 
 func TestReplayReportsAShortReductionAsReverted(t *testing.T) {
 	snapshot := fixtureSnapshot(t)
-	settings := map[string]string{settingOnShort: "revert", settingMinReduction: "0.9"}
+	settings := maps.Clone(snapshot.Settings)
+	settings[settingOnShort] = "revert"
+	settings[settingMinReduction] = "0.9"
 	replayed, err := Replay(snapshot, contracts.PluginConfig{Settings: settings})
 	if err != nil {
 		t.Fatalf("Replay: %v", err)
@@ -230,7 +225,7 @@ func TestCapturedFilesArePrivate(t *testing.T) {
 }
 
 func TestWriteSnapshotNeverOverwrites(t *testing.T) {
-	dir := t.TempDir()
+	dir := filepath.Join(t.TempDir(), "snapshots")
 	snapshot := fixtureSnapshot(t)
 	first, err := writeSnapshot(dir, snapshot)
 	if err != nil {
@@ -242,5 +237,128 @@ func TestWriteSnapshotNeverOverwrites(t *testing.T) {
 	}
 	if first == second {
 		t.Fatalf("two captures wrote the same file %s", first)
+	}
+}
+
+func encodedSnapshot(t *testing.T, snapshot Snapshot) []byte {
+	t.Helper()
+	data, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatalf("marshal the snapshot: %v", err)
+	}
+	return data
+}
+
+func TestDecodeSnapshotRefusesDataAfterTheObject(t *testing.T) {
+	data := append(encodedSnapshot(t, fixtureSnapshot(t)), []byte(" {}")...)
+	if _, err := DecodeSnapshot(bytes.NewReader(data)); !errors.Is(err, ErrInvalidSnapshot) {
+		t.Fatalf("DecodeSnapshot error = %v, want ErrInvalidSnapshot", err)
+	}
+}
+
+func TestDecodeSnapshotBoundsTheProbabilities(t *testing.T) {
+	for _, value := range []float64{-0.1, 1.5} {
+		snapshot := fixtureSnapshot(t)
+		snapshot.Judgments[0].PCall = value
+		if _, err := DecodeSnapshot(bytes.NewReader(encodedSnapshot(t, snapshot))); !errors.Is(err, ErrInvalidSnapshot) {
+			t.Fatalf("p_call %v: DecodeSnapshot error = %v, want ErrInvalidSnapshot", value, err)
+		}
+	}
+}
+
+func TestDecodeSnapshotRefusesADuplicateCallID(t *testing.T) {
+	snapshot := fixtureSnapshot(t)
+	snapshot.Judgments = append(snapshot.Judgments, snapshot.Judgments[0])
+	if _, err := DecodeSnapshot(bytes.NewReader(encodedSnapshot(t, snapshot))); !errors.Is(err, ErrInvalidSnapshot) {
+		t.Fatalf("DecodeSnapshot error = %v, want ErrInvalidSnapshot", err)
+	}
+}
+
+func TestReplayRechecksTheVersion(t *testing.T) {
+	snapshot := fixtureSnapshot(t)
+	snapshot.Version = snapshotVersion + 1
+	if _, err := Replay(snapshot, contracts.PluginConfig{Settings: snapshot.Settings}); !errors.Is(err, ErrInvalidSnapshot) {
+		t.Fatalf("Replay error = %v, want ErrInvalidSnapshot", err)
+	}
+}
+
+func TestReplayNeverEchoesTheAPIKey(t *testing.T) {
+	const canary = "canary-secret-value-7f3a"
+	_, err := Replay(fixtureSnapshot(t), contracts.PluginConfig{Settings: map[string]string{settingAPIKey: canary}})
+	if !errors.Is(err, ErrInvalidSetting) {
+		t.Fatalf("Replay error = %v, want ErrInvalidSetting", err)
+	}
+	if strings.Contains(err.Error(), canary) {
+		t.Fatalf("the api key leaked into %q", err)
+	}
+}
+
+func TestReplayOfNothingToPruneIsNotReverted(t *testing.T) {
+	snapshot := fixtureSnapshot(t)
+	for index := range snapshot.Judgments {
+		snapshot.Judgments[index].PCall = 1
+		snapshot.Judgments[index].PResult = 1
+	}
+	settings := map[string]string{settingKeepThreshold: "0", settingOnShort: "revert", settingMinReduction: "0.01"}
+	replayed, err := Replay(snapshot, contracts.PluginConfig{Settings: settings})
+	if err != nil {
+		t.Fatalf("Replay: %v", err)
+	}
+	if replayed.Reverted || len(replayed.Edits) != 0 {
+		t.Fatalf("reverted=%t edits=%d, want nothing reverted and nothing pruned", replayed.Reverted, len(replayed.Edits))
+	}
+}
+
+func TestReplayCountsTheCachedCallsApartFromTheUnanswered(t *testing.T) {
+	snapshot := fixtureSnapshot(t)
+	snapshot.Judgments = slices.DeleteFunc(snapshot.Judgments, func(judgment Judgment) bool {
+		return judgment.CallID == "toolu_03"
+	})
+	snapshot.Cached = []string{"toolu_03"}
+
+	settings := maps.Clone(snapshot.Settings)
+	settings[settingIncremental] = "true"
+	incremental, err := Replay(snapshot, contracts.PluginConfig{Settings: settings})
+	if err != nil {
+		t.Fatalf("Replay incremental: %v", err)
+	}
+	if incremental.Cached != 1 || incremental.Unanswered != 0 {
+		t.Fatalf("incremental: cached=%d unanswered=%d, want 1 and 0", incremental.Cached, incremental.Unanswered)
+	}
+
+	plain, err := Replay(snapshot, contracts.PluginConfig{Settings: snapshot.Settings})
+	if err != nil {
+		t.Fatalf("Replay plain: %v", err)
+	}
+	if plain.Cached != 0 || plain.Unanswered != 1 {
+		t.Fatalf("plain: cached=%d unanswered=%d, want 0 and 1", plain.Cached, plain.Unanswered)
+	}
+}
+
+func TestWriteSnapshotRefusesASharedDirectory(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "shared")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writeSnapshot(dir, fixtureSnapshot(t)); !errors.Is(err, errSnapshotDirShared) {
+		t.Fatalf("writeSnapshot error = %v, want errSnapshotDirShared", err)
+	}
+	if entries, err := os.ReadDir(dir); err != nil || len(entries) != 0 {
+		t.Fatalf("shared dir holds %d entries (%v), want none", len(entries), err)
+	}
+}
+
+func TestWriteSnapshotRefusesAnOversizedSnapshot(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "snapshots")
+	snapshot := fixtureSnapshot(t)
+	snapshot.Goal = strings.Repeat("g", maxSnapshotBytes)
+	if _, err := writeSnapshot(dir, snapshot); !errors.Is(err, errSnapshotTooLarge) {
+		t.Fatalf("writeSnapshot error = %v, want errSnapshotTooLarge", err)
+	}
+	if entries, err := os.ReadDir(dir); err == nil && len(entries) != 0 {
+		t.Fatalf("oversized snapshot left %d files behind", len(entries))
 	}
 }

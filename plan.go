@@ -234,6 +234,7 @@ type planReport struct {
 	outOfReach bool
 	capped     bool
 	cached     int
+	cachedIDs  []string
 	unanswered int
 	state      stateReport
 	goal       string
@@ -278,29 +279,38 @@ func (c *compactor) decide(ctx context.Context, history contracts.History, sessi
 	if c.opts.revertsShort() {
 		report.ceiling = c.reductionCeiling(calls, history)
 		if report.ceiling < c.opts.minReduction {
-			report.outOfReach = true
+			report.outOfReach = report.ceiling > 0
 			return report, nil
 		}
 	}
 	decided, unknown := c.decideLocally(calls, journal)
 	scope := c.scopeFor(session, goal)
-	asked := scope.partition(unknown, journal)
-	report.cached = len(unknown) - len(asked)
-	if len(asked) > 0 {
-		set, err := answer(ctx, calls, asked)
+	split := scope.partition(unknown, journal)
+	report.cached = len(split.served)
+	report.cachedIDs = idsOf(split.served)
+	if len(split.asked) > 0 {
+		set, err := answer(ctx, calls, split.asked)
 		report.sent = set.sent
 		report.capped = set.capped
 		report.state = set.state
-		report.judgments = judgmentsOf(asked, set.answers)
-		report.unanswered = len(asked) - len(report.judgments)
+		report.judgments = judgmentsOf(split.asked, set.answers)
+		report.unanswered = len(split.asked) - len(report.judgments)
 		if err != nil {
 			return report, err
 		}
-		scope.remember(c.decideAsked(asked, set.answers, decided, journal))
+		scope.remember(c.decideAsked(split.asked, set.answers, decided, journal))
 	}
 	report.edits = c.withinBudget(history, calls, decided, journal)
 	report.removed = removedTotals(calls, report.edits)
 	return report, nil
+}
+
+func idsOf(calls []toolCall) []string {
+	ids := make([]string, 0, len(calls))
+	for _, call := range calls {
+		ids = append(ids, call.source.ID)
+	}
+	return ids
 }
 
 func judgmentsOf(asked []toolCall, answers map[string]callAnswer) []Judgment {

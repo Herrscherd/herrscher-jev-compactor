@@ -75,19 +75,25 @@ func (s keepScope) digest(call toolCall) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (s keepScope) partition(calls []toolCall, journal *decisionLog) []toolCall {
+type keepSplit struct {
+	asked  []toolCall
+	served []toolCall
+}
+
+func (s keepScope) partition(calls []toolCall, journal *decisionLog) keepSplit {
 	if s.cache == nil {
-		return calls
+		return keepSplit{asked: calls}
 	}
-	var unknown []toolCall
+	var split keepSplit
 	for _, call := range calls {
 		if s.cache.holds(s.key(call), s.digest(call)) {
 			logDecision(journal, call, decisionKeep, reasonCache)
+			split.served = append(split.served, call)
 			continue
 		}
-		unknown = append(unknown, call)
+		split.asked = append(split.asked, call)
 	}
-	return unknown
+	return split
 }
 
 func (s keepScope) remember(kept []toolCall) {

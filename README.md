@@ -201,19 +201,28 @@ note says how many, as in `2 calls kept from the cache, not asked again.`
 
 `replay_dir` names a directory where each compaction writes one JSON snapshot:
 the history as Jev read it, the goal, the probabilities Jev gave for each call it
-judged, and the effective settings, without the API key. The directory is created
-with mode `0700` and the files with mode `0600`, under a unique name per
-compaction (`compaction-<UTC time>-<random>.json`). A snapshot that cannot be
-written is reported in the logs and the compaction goes on. Empty, the default,
-writes nothing.
+judged, the calls the incremental cache kept without asking, and the effective
+settings, without the API key. The snapshot holds the full history in clear,
+tool outputs included, so whatever the session read or wrote (files, command output,
+messages) is in the file, personal data and secrets among it. Files are created with mode `0600`, so only the owner of the directory can
+read them. Keep the directory out of shared storage and out of version control.
+
+The directory is created with mode `0700` when it does not exist. An existing
+directory that gives group or other any access is refused with a warning and
+nothing is written: the directory is never chmod-ed. A snapshot is at most 64 MiB
+once encoded; a larger one is refused with a warning and nothing is written. The
+files are unique per compaction (`compaction-<UTC time>-<random>.json`). A
+snapshot that cannot be written is reported in the logs, its partial file removed,
+and the compaction goes on. Empty, the default, writes nothing.
 
 `Replay` takes a snapshot and a settings map and returns the plan the stage would
-have made with those settings, without any network call. It reuses the decision
-code of the compaction, so replaying a snapshot with the settings it was captured
-under gives the same plan. A call with no recorded probability is kept and counted
-as unanswered rather than guessed. Replay does not apply `incremental`: calls the
-cache would have served were asked for in the capture and are unanswered here when
-Jev did not give a probability for them.
+have made with those settings, without any network call. It shares the decision
+code of the compaction, including the rule that a plan with nothing to prune or
+a short reduction is not applied. A call with no recorded probability is kept and
+counted as unanswered rather than guessed. When `incremental` is on, the calls the
+capture recorded as served by the cache are kept and counted in the `cached`
+column, not as unanswered; with `incremental` off they are counted as unanswered
+like any other call Jev did not judge.
 
 ### Bench
 
@@ -222,19 +231,30 @@ each settings file, then prints what each setting would have done:
 
 ```bash
 go run ./cmd/jev-bench -settings strict.settings -settings loose.settings compaction-*.json
-go run ./cmd/jev-bench -json -settings strict.settings session.json
+go run ./cmd/jev-bench -lang fr -json -settings strict.settings session.json
 ```
 
 A settings file holds `key=value` lines, blank lines skipped, laid over the recorded
-settings of each snapshot. The column `recorded` is the settings the snapshots were
-captured under, and each settings file is named by its base name. The table gives
-per setting the calls kept, truncated, pruned, unanswered and reverted, and the
-reduction in characters and in estimated tokens. `-json` prints the same figures as
-JSON. The bench never calls Jev and never reads the API key.
+settings of each snapshot. A settings file is at most 64 KiB and must be a regular
+file. The column `recorded` is the settings the snapshots were captured under, and
+each settings file is named by its base name. The table gives per setting the calls
+kept, truncated, pruned, unanswered, cached and reverted, and the reduction in
+characters and in estimated tokens. `-json` prints the same figures as JSON, with
+English keys whatever the language. `-lang en|fr` picks the language of the table,
+the help and the messages: `en` by default, any other value is a usage error. The
+bench never calls Jev and never reads the API key; its messages never echo a
+settings value, only the file and the line number.
 
-Exit codes: `0` success, `2` usage, `65` a snapshot that is not valid, `66` a file
-that does not exist, `74` an I/O error, `78` a settings file with a bad line or an
-unknown setting.
+Exit codes:
+
+| Code | Meaning |
+|---|---|
+| `0` | the comparison was printed, or the help was asked for |
+| `2` | the command line is wrong |
+| `65` | a snapshot is malformed, has another version or fails a check |
+| `66` | a snapshot or settings file does not exist or is not a regular file |
+| `74` | output or a file could not be read or written |
+| `78` | a settings file is malformed, too large or sets a setting jev refuses |
 
 ## Settings
 
@@ -266,7 +286,7 @@ unknown setting.
 | `max_requests` | `JEV_MAX_REQUESTS` | `0` | most requests sent to Jev for one compaction, retries included, `0` for no cap |
 | `max_sent_tokens` | `JEV_MAX_SENT_TOKENS` | `0` | most tokens sent to Jev for one compaction, retries included and estimated, `0` for no cap |
 | `decision_log` | `JEV_DECISION_LOG` | empty | JSONL file where each decision on a tool call is appended, with a `compaction` id per compaction; created or restricted to mode 0600, moved to `<file>.1` (replacing the previous backup) once it reaches 10 MiB, under a `<file>.lock` file lock shared by every process writing the same path; once it is over twice that size and cannot be rotated, writes stop; empty for none |
-| `replay_dir` | `JEV_REPLAY_DIR` | empty | directory where each compaction writes one JSON snapshot for `Replay` and `cmd/jev-bench`, created with mode 0700 and its files with mode 0600; a snapshot that cannot be written is logged and the compaction goes on; empty for none |
+| `replay_dir` | `JEV_REPLAY_DIR` | empty | directory where each compaction writes one JSON snapshot for `Replay` and `cmd/jev-bench`, created with mode 0700 when missing and its files with mode 0600; an existing directory that gives group or others any access is refused with a warning, as is a snapshot over 64 MiB; a snapshot holds the full history in clear, tool outputs included; a snapshot that cannot be written is logged and the compaction goes on; empty for none |
 | `incremental` | `JEV_INCREMENTAL` | `false` | `true` does not ask Jev again about the calls it already said to keep in an earlier compaction of the same session, while their content and the goal stay the same; the cache holds 4096 calls and is emptied when a new call arrives while it is full |
 | `max_parallel` | `JEV_MAX_PARALLEL` | `4` | requests sent to Jev at once, at least 1 |
 | `on_short` | `JEV_ON_SHORT` | `keep` | `keep` leaves a short reduction to the next stage, `done` stops the stack there, `revert` leaves the history as it was when the reduction is short |
@@ -316,6 +336,16 @@ scripts/check.sh
 
 runs the quality chain of the go-book: tidy, format, golangci-lint, the
 comment check, tests with `-race`, build and govulncheck.
+
+`go test ./...` never reaches the network. The live test, which sends a real
+compaction to Jev with the key of `TYPESAFE_API_KEY`, sits behind the `live` build
+tag and is run on demand:
+
+```bash
+go test -tags live -run TestLiveJev ./...
+```
+
+`scripts/check.sh` and CI never set the tag.
 
 ## License
 
