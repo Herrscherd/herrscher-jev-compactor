@@ -273,5 +273,10 @@
     "description": "The Jev stage would prune Count tool calls, but dry_run is set so nothing changed",
     "one": "Jev élaguerait {{.Count}} appel d'outil, essai à blanc : l'historique reste inchangé",
     "other": "Jev élaguerait {{.Count}} appels d'outil, essai à blanc : l'historique reste inchangé"
+  },
+  {
+    "id": "jev.error.state_above_request",
+    "description": "The max_state_tokens setting State is not below max_request_tokens Request, so the state would never fit the request",
+    "other": "max_state_tokens ({{.State}}) doit rester inférieur à max_request_tokens ({{.Request}}), sinon l'état ne tient jamais dans la requête"
   }
 ]

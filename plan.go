@@ -217,10 +217,6 @@ func toolRunes(history contracts.History) int {
 	return total
 }
 
-func historyRunes(history contracts.History) int {
-	return textRunes(history) + toolRunes(history)
-}
-
 func (o options) thresholdsFor(picked rule) thresholds {
 	return thresholds{
 		call:   picked.callKeep.or(picked.threshold.or(o.callKeepThreshold())),
@@ -399,7 +395,7 @@ func (c *compactor) verdictEdit(call toolCall, verdict decision, cut truncation,
 	if !prune {
 		return plannedEdit{}, false
 	}
-	return plannedEdit{edit: edit, keep: keep, removed: removalOf(call, edit).runes}, true
+	return plannedEdit{edit: edit, keep: keep, removed: removalOf(call, edit).in(c.opts.measureUnit())}, true
 }
 
 func (c *compactor) withinBudget(history contracts.History, calls []toolCall, decided map[string]plannedEdit, journal *decisionLog) []contracts.HistoryEdit {
@@ -409,7 +405,7 @@ func (c *compactor) withinBudget(history contracts.History, calls []toolCall, de
 			planned = append(planned, edit)
 		}
 	}
-	edits := fitBudget(planned, c.opts.budget(), historyRunes(history))
+	edits := fitBudget(planned, c.opts.budget(), c.opts.measureUnit().historySize(history))
 	c.logBudgetDemotions(calls, decided, edits, journal)
 	return edits
 }

@@ -1,6 +1,7 @@
 package jev
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -94,6 +95,22 @@ func TestTokenReductionIsMeasuredOnTheHistoryAfterThePrune(t *testing.T) {
 	}
 	if result.Done || !strings.Contains(result.Note, "is 0% smaller") {
 		t.Fatalf("done = %v, note = %q, want the real token share of 0%% and not done", result.Done, result.Note)
+	}
+}
+
+func TestTokenReductionFallsBackToThePlannedShareWhenTheHistoryIsNotReadAfterThePrune(t *testing.T) {
+	server := &fakeJev{answers: sessionAnswers()}
+	stage := newTestCompactor(t, server, map[string]string{settingReductionUnit: "tokens", settingMinReduction: "0.01"})
+	editor := &fakeHistory{history: sessionHistory(), afterPruneErr: errors.New("history gone"), outcome: contracts.PruneOutcome{Edited: 2, CharsBefore: 1000, CharsAfter: 600}}
+	result, err := stage.Compact(t.Context(), contracts.CompactRequest{History: editor}, nil)
+	if err != nil {
+		t.Fatalf("Compact: %v", err)
+	}
+	if len(editor.pruned) != 1 {
+		t.Fatalf("PruneHistory calls = %d, want 1", len(editor.pruned))
+	}
+	if result.Stats.Outcome == contracts.CompactFailed || !result.Done {
+		t.Fatalf("outcome = %v, done = %v, want the prune reported with the planned share", result.Stats.Outcome, result.Done)
 	}
 }
 

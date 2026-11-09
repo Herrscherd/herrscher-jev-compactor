@@ -2,6 +2,7 @@ package jev
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -76,6 +77,7 @@ func TestParseOptionsRefusesIncoherentSettings(t *testing.T) {
 		"state as large as the request": {settingMaxStateTokens: "30000", settingMaxRequestTokens: "30000"},
 		"state larger than the request": {settingMaxStateTokens: "40000", settingMaxRequestTokens: "30000"},
 		"target above the removal cap":  {settingMinReduction: "0.5", settingMaxRemovedShare: "0.3"},
+		"tokens target above the cap":   {settingReductionUnit: "tokens", settingMinReduction: "0.5", settingMaxRemovedShare: "0.3"},
 	}
 	for name, settings := range cases {
 		settings[settingAPIKey] = "key"
@@ -86,7 +88,7 @@ func TestParseOptionsRefusesIncoherentSettings(t *testing.T) {
 	}
 	coherent := map[string]string{
 		settingAPIKey:           "key",
-		settingMinReduction:     "0.5",
+		settingMinReduction:     "0.2",
 		settingMaxRemovedShare:  "0.3",
 		settingReductionUnit:    "tokens",
 		settingMaxStateTokens:   "20000",
@@ -94,5 +96,15 @@ func TestParseOptionsRefusesIncoherentSettings(t *testing.T) {
 	}
 	if _, err := parseOptions(contracts.PluginConfig{Settings: coherent}); err != nil {
 		t.Fatalf("parseOptions(coherent) error = %v, want none", err)
+	}
+}
+
+func TestParseOptionsNamesBothTokenSettingsWhenStateIsAboveRequest(t *testing.T) {
+	settings := map[string]string{settingAPIKey: "key", settingMaxStateTokens: "40000", settingMaxRequestTokens: "30000"}
+	_, err := parseOptions(contracts.PluginConfig{Settings: settings})
+	for _, name := range []string{settingMaxStateTokens, settingMaxRequestTokens} {
+		if err == nil || !strings.Contains(err.Error(), name) {
+			t.Fatalf("parseOptions error = %v, want it to name %s", err, name)
+		}
 	}
 }

@@ -119,7 +119,9 @@ and the first rule whose motif matches the tool name wins. A motif is a
 `path.Match` glob such as `Read*`. The actions are `keep` (the call stays
 untouched), `prune` (the call is pruned, as `PruneCall`) and `truncate` (the
 output keeps its first `head` and last `tail` characters, as `PruneResult`).
-`head=0` keeps none of the output's head. A rule with no action leaves the
+`head=0` keeps none of the output's head. In the wording of the issue, `keep`
+is `always_keep` (a matching call is always kept) and `prune` is `never_keep`
+(a matching call is never kept). A rule with no action leaves the
 decision to Jev, judged against the thresholds it sets: `threshold=` sets both
 channels, `call_threshold=` and `result_threshold=` set one each and win over
 `threshold=` whatever the order, and each is given at most once. A rule
@@ -209,10 +211,10 @@ note says how many, as in `2 calls kept from the cache, not asked again.`
 | `include_empty_results` | `JEV_INCLUDE_EMPTY_RESULTS` | `false` | `true` also judges calls whose result is empty, which can include calls still running |
 | `min_result_chars` | `JEV_MIN_RESULT_CHARS` | `0` | outputs shorter than this many characters always stay |
 | `max_pruned` | `JEV_MAX_PRUNED` | `0` | most tool calls one compaction edits, pruned or truncated, `0` for no limit |
-| `max_removed_share` | `JEV_MAX_REMOVED_SHARE` | `1` | most of the history, above 0 up to 1, one compaction may remove, `1` for no limit; refused when `min_reduction` is above it with `reduction_unit` `characters` |
+| `max_removed_share` | `JEV_MAX_REMOVED_SHARE` | `1` | most of the history, above 0 up to 1, one compaction may remove, `1` for no limit; measured in `reduction_unit`; refused when `min_reduction` is above it, in either unit |
 | `preserve_recent` | `JEV_PRESERVE_RECENT` | `6` | newest messages whose calls are pinned |
 | `truncate_head` | `JEV_TRUNCATE_HEAD` | `300` | characters kept from an output Jev lets go, `0` for none |
-| `truncate_tail` | `JEV_TRUNCATE_TAIL` | `0` | characters kept from the end of an output Jev lets go |
+| `truncate_tail` | `JEV_TRUNCATE_TAIL` | `0` | characters kept from the end of an output Jev lets go; needs a backend honoring `KeepTail`, herrscher-claude-backend v0.14.0 or later |
 | `min_reduction` | `JEV_MIN_REDUCTION` | `0.25` | share of the history, 0 to 1, that stops the stack |
 | `reduction_unit` | `JEV_REDUCTION_UNIT` | `characters` | unit `min_reduction` is measured in: `characters`, or `tokens` estimated as below |
 | `max_state_tokens` | `JEV_MAX_STATE_TOKENS` | `25000` | token budget of the state, below `max_request_tokens` |
@@ -222,7 +224,7 @@ note says how many, as in `2 calls kept from the cache, not asked again.`
 | `retry_backoff` | `JEV_RETRY_BACKOFF` | `1s` | first wait before a retry, as a Go duration, doubled at each retry and capped at 30s |
 | `max_requests` | `JEV_MAX_REQUESTS` | `0` | most requests sent to Jev for one compaction, retries included, `0` for no cap |
 | `max_sent_tokens` | `JEV_MAX_SENT_TOKENS` | `0` | most tokens sent to Jev for one compaction, retries included and estimated, `0` for no cap |
-| `decision_log` | `JEV_DECISION_LOG` | empty | JSONL file where each decision on a tool call is appended, with a `compaction` id per compaction; created or restricted to mode 0600, moved to `<file>.1` (replacing the previous backup) once it reaches 10 MiB; empty for none |
+| `decision_log` | `JEV_DECISION_LOG` | empty | JSONL file where each decision on a tool call is appended, with a `compaction` id per compaction; created or restricted to mode 0600, moved to `<file>.1` (replacing the previous backup) once it reaches 10 MiB, under a `<file>.lock` file lock shared by every process writing the same path; once it is over twice that size and cannot be rotated, writes stop; empty for none |
 | `incremental` | `JEV_INCREMENTAL` | `false` | `true` does not ask Jev again about the calls it already said to keep in an earlier compaction of the same session, while their content and the goal stay the same; the cache holds 4096 calls and is emptied when a new call arrives while it is full |
 | `max_parallel` | `JEV_MAX_PARALLEL` | `4` | requests sent to Jev at once, at least 1 |
 | `on_short` | `JEV_ON_SHORT` | `keep` | `keep` leaves a short reduction to the next stage, `done` stops the stack there, `revert` leaves the history as it was when the reduction is short |

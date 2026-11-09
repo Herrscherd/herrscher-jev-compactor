@@ -23,15 +23,15 @@ type budget struct {
 	maxRemovedShare float64
 }
 
-func (b budget) exceeded(pruned, removed, historyRunes int) bool {
+func (b budget) exceeded(pruned, removed, historySize int) bool {
 	if b.maxPruned > 0 && pruned > b.maxPruned {
 		return true
 	}
 	share := orDefault(b.maxRemovedShare, fullShare)
-	return float64(removed) > share*float64(historyRunes)
+	return float64(removed) > share*float64(historySize)
 }
 
-func fitBudget(planned []plannedEdit, limits budget, historyRunes int) []contracts.HistoryEdit {
+func fitBudget(planned []plannedEdit, limits budget, historySize int) []contracts.HistoryEdit {
 	removed := 0
 	for _, edit := range planned {
 		removed += edit.removed
@@ -39,7 +39,7 @@ func fitBudget(planned []plannedEdit, limits budget, historyRunes int) []contrac
 	dropped := make([]bool, len(planned))
 	pruned := len(planned)
 	for _, index := range demotionOrder(planned) {
-		if !limits.exceeded(pruned, removed, historyRunes) {
+		if !limits.exceeded(pruned, removed, historySize) {
 			break
 		}
 		dropped[index] = true

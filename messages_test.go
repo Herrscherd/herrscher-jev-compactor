@@ -6,6 +6,17 @@ import (
 	"github.com/Herrscherd/herrscher-contracts/i18n"
 )
 
+func TestStateAboveRequestNamesBothSettingsInBothLanguages(t *testing.T) {
+	params := map[string]any{"State": 40000, "Request": 30000}
+	texts := newMessages()
+	if got, want := texts.in(i18n.English, errorStateAboveRequest, params), "max_state_tokens (40000) must stay below max_request_tokens (30000), or the state never fits the request"; got != want {
+		t.Fatalf("en = %q, want %q", got, want)
+	}
+	if got, want := texts.in(i18n.French, errorStateAboveRequest, params), "max_state_tokens (40000) doit rester inférieur à max_request_tokens (30000), sinon l'état ne tient jamais dans la requête"; got != want {
+		t.Fatalf("fr = %q, want %q", got, want)
+	}
+}
+
 func TestRichNotesReadSingularAndPluralInBothLanguages(t *testing.T) {
 	one := map[string]any{"Count": 1, "Kept": 0, "Truncated": 1, "Pruned": 0, "Percent": 41, "Target": 25}
 	many := map[string]any{"Count": 25, "Kept": 12, "Truncated": 5, "Pruned": 8, "Percent": 41, "Target": 25}

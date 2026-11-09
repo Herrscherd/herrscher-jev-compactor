@@ -93,7 +93,6 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 	before := toolRunes(history)
 	run.chars(before, before)
 	journal := openDecisionLog(c.opts.decisionLog)
-	defer journal.close()
 	report, err := c.plan(ctx, history, req, journal)
 	run.examine(report)
 	if err != nil {
@@ -125,23 +124,21 @@ func (c *compactor) Compact(ctx context.Context, req contracts.CompactRequest, _
 	if err != nil {
 		return run.finish(contracts.CompactResult{}, contracts.CompactFailed), &unavailableError{cause: err}
 	}
-	reduction, err := c.reductionMeasured(ctx, req.History, outcome, history)
-	if err != nil {
-		return run.finish(contracts.CompactResult{}, contracts.CompactFailed), &unavailableError{cause: err}
-	}
+	reduction := c.reductionMeasured(ctx, req.History, outcome, history, report)
 	return c.result(run, report, outcome, reduction), nil
 }
 
-func (c *compactor) reductionMeasured(ctx context.Context, editor contracts.HistoryEditor, outcome contracts.PruneOutcome, history contracts.History) (float64, error) {
+func (c *compactor) reductionMeasured(ctx context.Context, editor contracts.HistoryEditor, outcome contracts.PruneOutcome, history contracts.History, report planReport) float64 {
 	if c.opts.measureUnit() != unitEstimated {
-		return reductionOf(outcome, textRunes(history)), nil
+		return reductionOf(outcome, textRunes(history))
 	}
 	after, err := editor.ReadHistory(ctx)
 	if err != nil {
-		return 0, err
+		slog.Warn("jev: history not read after the prune, the planned reduction is reported", "err", err)
+		return c.plannedShare(report, history)
 	}
 	unit := c.opts.measureUnit()
-	return shareOf(unit.historySize(history)-unit.historySize(after), unit.historySize(history)), nil
+	return shareOf(unit.historySize(history)-unit.historySize(after), unit.historySize(history))
 }
 
 func (c *compactor) reverted(run *compactRun, report planReport, key string, reduction float64) contracts.CompactResult {

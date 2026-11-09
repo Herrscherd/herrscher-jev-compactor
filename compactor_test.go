@@ -17,13 +17,17 @@ import (
 )
 
 type fakeHistory struct {
-	history    contracts.History
-	outcome    contracts.PruneOutcome
-	afterPrune *contracts.History
-	pruned     [][]contracts.HistoryEdit
+	history       contracts.History
+	outcome       contracts.PruneOutcome
+	afterPrune    *contracts.History
+	afterPruneErr error
+	pruned        [][]contracts.HistoryEdit
 }
 
 func (f *fakeHistory) ReadHistory(context.Context) (contracts.History, error) {
+	if f.afterPruneErr != nil && len(f.pruned) > 0 {
+		return contracts.History{}, f.afterPruneErr
+	}
 	if f.afterPrune != nil && len(f.pruned) > 0 {
 		return *f.afterPrune, nil
 	}

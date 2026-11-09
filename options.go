@@ -139,6 +139,25 @@ func (e *settingError) Notice() contracts.Notice {
 	}
 }
 
+type incoherentError struct {
+	message string
+	setting string
+	value   string
+}
+
+func (e *incoherentError) Error() string {
+	return fmt.Sprintf("%s: %s", ErrInvalidSetting, e.message)
+}
+
+func (e *incoherentError) Unwrap() error { return ErrInvalidSetting }
+
+func (e *incoherentError) Notice() contracts.Notice {
+	return contracts.Notice{
+		Code: contracts.CodeSettingInvalid,
+		Args: []contracts.Arg{contracts.Text("Setting", e.setting), contracts.Text("Value", e.value)},
+	}
+}
+
 type missingKeyError struct{}
 
 func (*missingKeyError) Error() string {
@@ -345,9 +364,9 @@ func settings(texts *messages) []contracts.Setting {
 
 func refuseIncoherent(read *settingReader, opts options) {
 	if opts.maxStateTokens >= opts.maxRequestTokens {
-		read.refuse(settingMaxStateTokens, strconv.Itoa(opts.maxStateTokens))
+		read.refuseStateAboveRequest(opts.maxStateTokens, opts.maxRequestTokens)
 	}
-	if opts.maxRemovedShare > 0 && opts.measureUnit() == unitCharacters && opts.minReduction > opts.maxRemovedShare {
+	if opts.maxRemovedShare > 0 && opts.minReduction > opts.maxRemovedShare {
 		read.refuse(settingMinReduction, strconv.FormatFloat(opts.minReduction, 'f', -1, 64))
 	}
 }
@@ -357,7 +376,7 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 	if apiKey == "" {
 		return options{}, &missingKeyError{}
 	}
-	read := settingReader{cfg: cfg}
+	read := settingReader{cfg: cfg, texts: newMessages()}
 	opts := options{
 		apiKey:               apiKey,
 		model:                read.text(settingModel, defaultModel),
@@ -415,8 +434,20 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 }
 
 type settingReader struct {
-	cfg contracts.PluginConfig
-	err error
+	cfg   contracts.PluginConfig
+	err   error
+	texts *messages
+}
+
+func (r *settingReader) refuseStateAboveRequest(state, request int) {
+	if r.err != nil {
+		return
+	}
+	r.err = &incoherentError{
+		message: r.texts.english(errorStateAboveRequest, map[string]any{"State": state, "Request": request}),
+		setting: settingMaxStateTokens + ", " + settingMaxRequestTokens,
+		value:   strconv.Itoa(state) + ", " + strconv.Itoa(request),
+	}
 }
 
 func (r *settingReader) raw(key string) (string, bool) {

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -98,8 +99,7 @@ func TestDecisionLogRotatesWhenItGrowsPastTheLimit(t *testing.T) {
 	if err := os.WriteFile(path, []byte(old), decisionLogMode); err != nil {
 		t.Fatalf("seed decision log: %v", err)
 	}
-	journal := openDecisionLogWithLimit(path, 50)
-	journal.close()
+	openDecisionLogWithLimit(path, 50)
 	backup, err := os.ReadFile(path + decisionLogBackupSuffix)
 	if err != nil || string(backup) != old {
 		t.Fatalf("backup = %q, %v, want the previous log moved aside", backup, err)
@@ -115,9 +115,77 @@ func TestDecisionLogKeepsASmallLogInPlace(t *testing.T) {
 	if err := os.WriteFile(path, []byte("kept\n"), decisionLogMode); err != nil {
 		t.Fatalf("seed decision log: %v", err)
 	}
-	openDecisionLogWithLimit(path, 1<<20).close()
+	openDecisionLogWithLimit(path, 1<<20)
 	if _, err := os.Stat(path + decisionLogBackupSuffix); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("backup stat = %v, want no rotation below the limit", err)
+	}
+}
+
+func TestDecisionLogKeepsEveryLineWholeWhenWritersRotateConcurrently(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "decisions.jsonl")
+	journal := openDecisionLogWithLimit(path, 300)
+	var writers sync.WaitGroup
+	for worker := range 4 {
+		writers.Go(func() {
+			for n := range 50 {
+				journal.write([]any{"worker", worker, "n", n})
+			}
+		})
+	}
+	writers.Wait()
+	for _, name := range []string{path, path + decisionLogBackupSuffix} {
+		content, err := os.ReadFile(filepath.Clean(name))
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		for line := range strings.SplitSeq(strings.TrimSpace(string(content)), "\n") {
+			var entry map[string]any
+			if err := json.Unmarshal([]byte(line), &entry); err != nil {
+				t.Fatalf("%s holds a torn line %q: %v", name, line, err)
+			}
+		}
+	}
+}
+
+func TestDecisionLogKeepsWritingWhenRotationFailsBelowTwiceTheLimit(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "decisions.jsonl")
+	seed := strings.Repeat("x", 159) + "\n"
+	if err := os.WriteFile(path, []byte(seed), decisionLogMode); err != nil {
+		t.Fatalf("seed decision log: %v", err)
+	}
+	if err := os.Mkdir(path+decisionLogBackupSuffix, decisionLogMode); err != nil {
+		t.Fatalf("block rotation: %v", err)
+	}
+	journal := openDecisionLogWithLimit(path, 150)
+	journal.write([]any{"n", 1})
+	content, err := os.ReadFile(filepath.Clean(path))
+	if err != nil {
+		t.Fatalf("read decision log: %v", err)
+	}
+	if lines := strings.Count(string(content), "\n"); lines != 2 {
+		t.Fatalf("lines = %d, want the seed and the new entry", lines)
+	}
+}
+
+func TestDecisionLogStopsWritingPastTwiceTheLimit(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "decisions.jsonl")
+	seed := strings.Repeat("x", 59) + "\n"
+	if err := os.WriteFile(path, []byte(seed), decisionLogMode); err != nil {
+		t.Fatalf("seed decision log: %v", err)
+	}
+	if err := os.Mkdir(path+decisionLogBackupSuffix, decisionLogMode); err != nil {
+		t.Fatalf("block rotation: %v", err)
+	}
+	journal := openDecisionLogWithLimit(path, 50)
+	for n := range 5 {
+		journal.write([]any{"n", n})
+	}
+	content, err := os.ReadFile(filepath.Clean(path))
+	if err != nil {
+		t.Fatalf("read decision log: %v", err)
+	}
+	if lines := strings.Count(string(content), "\n"); lines != 2 {
+		t.Fatalf("lines = %d, want the seed and the first entry only, once the log is past twice its limit", lines)
 	}
 }
 
@@ -126,7 +194,7 @@ func TestDecisionLogRestrictsAnExistingFileToItsOwner(t *testing.T) {
 	if err := os.WriteFile(path, nil, 0o644); err != nil {
 		t.Fatalf("seed decision log: %v", err)
 	}
-	openDecisionLog(path).close()
+	openDecisionLog(path)
 	info, err := os.Stat(path)
 	if err != nil || info.Mode().Perm() != decisionLogMode {
 		t.Fatalf("mode = %v, %v, want %v", info, err, os.FileMode(decisionLogMode))

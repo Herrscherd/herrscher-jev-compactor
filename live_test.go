@@ -17,7 +17,7 @@ func TestLiveJevAnswersTheSessionHistory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newCompactor: %v", err)
 	}
-	editor := &fakeHistory{history: sessionHistory(), outcome: contracts.PruneOutcome{Edited: 0}}
+	editor := &fakeHistory{history: sessionHistory(), outcome: contracts.PruneOutcome{Edited: 1, CharsBefore: 1000, CharsAfter: 600}}
 	result, err := stage.Compact(t.Context(), contracts.CompactRequest{History: editor}, nil)
 	if err != nil {
 		t.Fatalf("Compact against the live API: %v", err)
@@ -30,5 +30,11 @@ func TestLiveJevAnswersTheSessionHistory(t *testing.T) {
 	}
 	if result.Note == "" {
 		t.Fatal("live compaction returned no note")
+	}
+	if len(editor.pruned) == 0 {
+		t.Fatal("live compaction pruned nothing, so no reduction can be checked")
+	}
+	if editor.outcome.CharsAfter >= editor.outcome.CharsBefore {
+		t.Fatalf("reduction = %d -> %d chars, want fewer chars after the prune", editor.outcome.CharsBefore, editor.outcome.CharsAfter)
 	}
 }
