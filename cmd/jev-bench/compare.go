@@ -1,0 +1,244 @@
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"maps"
+	"os"
+	"path/filepath"
+	"strings"
+
+	contracts "github.com/Herrscherd/herrscher-contracts"
+
+	jev "github.com/Herrscherd/herrscher-jev-compactor"
+)
+
+const recordedName = "recorded"
+
+const maxSettingsBytes = 64 << 10
+
+var (
+	errSettingsLine     = errors.New("settings line is not key=value")
+	errSettingsTooLarge = errors.New("settings file is larger than 64 KiB")
+	errNotRegular       = errors.New("not a regular file")
+)
+
+type lineError struct {
+	path string
+	line int
+}
+
+func (e lineError) Error() string {
+	return fmt.Sprintf("%s:%d: %v", e.path, e.line, errSettingsLine)
+}
+
+func (e lineError) Unwrap() error {
+	return errSettingsLine
+}
+
+type fileError struct {
+	path string
+	kind error
+}
+
+func (e fileError) Error() string {
+	return e.path + ": " + e.kind.Error()
+}
+
+func (e fileError) Unwrap() error {
+	return e.kind
+}
+
+type comparison struct {
+	Snapshots int       `json:"snapshots"`
+	Settings  []summary `json:"settings"`
+}
+
+type summary struct {
+	Setting         string  `json:"setting"`
+	Kept            int     `json:"kept"`
+	Truncated       int     `json:"truncated"`
+	Pruned          int     `json:"pruned"`
+	Unanswered      int     `json:"unanswered"`
+	Cached          int     `json:"cached"`
+	Reverted        int     `json:"reverted"`
+	CharsReduction  float64 `json:"chars_reduction"`
+	TokensReduction float64 `json:"tokens_reduction"`
+}
+
+type column struct {
+	name      string
+	overrides map[string]string
+}
+
+type tally struct {
+	name          string
+	kept          int
+	truncated     int
+	pruned        int
+	unanswered    int
+	cached        int
+	reverted      int
+	charsBefore   int
+	charsRemoved  int
+	tokensBefore  int
+	tokensRemoved int
+}
+
+func compare(snapshotPaths, settingsPaths []string) (comparison, error) {
+	snapshots, err := readSnapshots(snapshotPaths)
+	if err != nil {
+		return comparison{}, err
+	}
+	columns, err := readColumns(settingsPaths)
+	if err != nil {
+		return comparison{}, err
+	}
+	result := comparison{Snapshots: len(snapshots)}
+	for _, current := range columns {
+		total, replayErr := current.replay(snapshots)
+		if replayErr != nil {
+			return comparison{}, replayErr
+		}
+		result.Settings = append(result.Settings, total.summary())
+	}
+	return result, nil
+}
+
+func (c column) replay(snapshots []jev.Snapshot) (tally, error) {
+	total := tally{name: c.name}
+	for index := range snapshots {
+		replayed, err := jev.Replay(snapshots[index], contracts.PluginConfig{Settings: c.settingsFor(snapshots[index])})
+		if err != nil {
+			return tally{}, fmt.Errorf("%s: %w", c.name, err)
+		}
+		total = total.add(replayed)
+	}
+	return total, nil
+}
+
+func (c column) settingsFor(snapshot jev.Snapshot) map[string]string {
+	merged := make(map[string]string, len(snapshot.Settings)+len(c.overrides))
+	maps.Copy(merged, snapshot.Settings)
+	maps.Copy(merged, c.overrides)
+	return merged
+}
+
+func (t tally) add(replayed jev.Replayed) tally {
+	t.kept += replayed.Kept
+	t.truncated += replayed.Truncated
+	t.pruned += replayed.Pruned
+	t.unanswered += replayed.Unanswered
+	t.cached += replayed.Cached
+	t.charsBefore += replayed.CharsBefore
+	t.charsRemoved += replayed.CharsRemoved
+	t.tokensBefore += replayed.TokensBefore
+	t.tokensRemoved += replayed.TokensRemoved
+	if replayed.Reverted {
+		t.reverted++
+	}
+	return t
+}
+
+func (t tally) summary() summary {
+	return summary{
+		Setting:         t.name,
+		Kept:            t.kept,
+		Truncated:       t.truncated,
+		Pruned:          t.pruned,
+		Unanswered:      t.unanswered,
+		Cached:          t.cached,
+		Reverted:        t.reverted,
+		CharsReduction:  shareOf(t.charsRemoved, t.charsBefore),
+		TokensReduction: shareOf(t.tokensRemoved, t.tokensBefore),
+	}
+}
+
+func shareOf(part, whole int) float64 {
+	if whole <= 0 {
+		return 0
+	}
+	return float64(part) / float64(whole)
+}
+
+func readSnapshots(paths []string) ([]jev.Snapshot, error) {
+	snapshots := make([]jev.Snapshot, 0, len(paths))
+	for _, path := range paths {
+		snapshot, err := readSnapshot(path)
+		if err != nil {
+			return nil, err
+		}
+		snapshots = append(snapshots, snapshot)
+	}
+	return snapshots, nil
+}
+
+func readSnapshot(path string) (jev.Snapshot, error) {
+	file, err := openRegular(path)
+	if err != nil {
+		return jev.Snapshot{}, err
+	}
+	snapshot, decodeErr := jev.DecodeSnapshot(file)
+	if joined := errors.Join(decodeErr, file.Close()); joined != nil {
+		return jev.Snapshot{}, fileError{path: path, kind: joined}
+	}
+	return snapshot, nil
+}
+
+func openRegular(path string) (*os.File, error) {
+	file, err := os.Open(filepath.Clean(path))
+	if err != nil {
+		return nil, fileError{path: path, kind: err}
+	}
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() {
+		return nil, fileError{path: path, kind: errors.Join(errNotRegular, err, file.Close())}
+	}
+	return file, nil
+}
+
+func readColumns(paths []string) ([]column, error) {
+	columns := []column{{name: recordedName}}
+	for _, path := range paths {
+		overrides, err := readSettings(path)
+		if err != nil {
+			return nil, err
+		}
+		name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+		columns = append(columns, column{name: name, overrides: overrides})
+	}
+	return columns, nil
+}
+
+func readSettings(path string) (map[string]string, error) {
+	file, err := openRegular(path)
+	if err != nil {
+		return nil, err
+	}
+	data, readErr := io.ReadAll(io.LimitReader(file, maxSettingsBytes+1))
+	if joined := errors.Join(readErr, file.Close()); joined != nil {
+		return nil, fileError{path: path, kind: joined}
+	}
+	if len(data) > maxSettingsBytes {
+		return nil, fileError{path: path, kind: errSettingsTooLarge}
+	}
+	return parseSettings(path, string(data))
+}
+
+func parseSettings(path, text string) (map[string]string, error) {
+	settings := make(map[string]string)
+	for number, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		key, value, found := strings.Cut(line, "=")
+		key = strings.TrimSpace(key)
+		if !found || key == "" {
+			return nil, lineError{path: path, line: number + 1}
+		}
+		settings[key] = strings.TrimSpace(value)
+	}
+	return settings, nil
+}

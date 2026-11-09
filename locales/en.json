@@ -200,6 +200,11 @@
     "other": "JSONL file where each decision on a tool call is appended, created with mode 0600, empty for none"
   },
   {
+    "id": "jev.setting.replay_dir",
+    "description": "Help of the replay_dir setting: the directory where each compaction writes a JSON snapshot to replay, empty for none",
+    "other": "directory where each compaction writes a JSON snapshot for replay, created with mode 0700, empty for none"
+  },
+  {
     "id": "jev.setting.retries",
     "description": "Help of the retries setting: how many times a request to Jev is sent again on a 429 or a 5xx answer, 0 for none",
     "other": "times a Jev request is sent again after a 429 or a 5xx answer, at most 10, 0 for none"
@@ -283,5 +288,115 @@
     "id": "jev.error.state_above_request",
     "description": "The max_state_tokens setting State is not below max_request_tokens Request, so the state would never fit the request",
     "other": "max_state_tokens ({{.State}}) must stay below max_request_tokens ({{.Request}}), or the state never fits the request"
+  },
+  {
+    "id": "jev.bench.usage.line",
+    "description": "Usage line of jev-bench, printed by -h and after a wrong command line",
+    "other": "usage: jev-bench [-lang en|fr] [-json] [-settings file]... snapshot..."
+  },
+  {
+    "id": "jev.bench.flag.lang",
+    "description": "Help line of the -lang flag of jev-bench",
+    "other": "  -lang en|fr  language of the output, en by default"
+  },
+  {
+    "id": "jev.bench.flag.json",
+    "description": "Help line of the -json flag of jev-bench",
+    "other": "  -json  print the comparison as JSON"
+  },
+  {
+    "id": "jev.bench.flag.settings",
+    "description": "Help line of the -settings flag of jev-bench",
+    "other": "  -settings file  settings file of key=value lines laid over the recorded settings, repeatable"
+  },
+  {
+    "id": "jev.bench.error.prefix",
+    "description": "Prefix of every failure line of jev-bench: Error is the reason",
+    "other": "jev-bench: {{.Error}}"
+  },
+  {
+    "id": "jev.bench.error.usage",
+    "description": "A wrong command line: Cause is the flag error",
+    "other": "the command line is wrong: {{.Cause}}"
+  },
+  {
+    "id": "jev.bench.error.no_snapshot",
+    "description": "No snapshot file given on the command line",
+    "other": "at least one snapshot file is needed"
+  },
+  {
+    "id": "jev.bench.error.settings_line",
+    "description": "A settings line without a key=value shape: Line and Path",
+    "other": "settings line {{.Line}} of {{.Path}} is not key=value"
+  },
+  {
+    "id": "jev.bench.error.not_regular",
+    "description": "A snapshot or settings path that is not a regular file: Path",
+    "other": "{{.Path}} is not a regular file"
+  },
+  {
+    "id": "jev.bench.error.too_large",
+    "description": "A settings file over its size limit: Path and Limit in bytes",
+    "other": "{{.Path}} is larger than {{.Limit}} bytes"
+  },
+  {
+    "id": "jev.bench.error.file",
+    "description": "A file that could not be read: Path is the file, Error the reason",
+    "other": "{{.Path}}: {{.Error}}"
+  },
+  {
+    "id": "jev.bench.table.snapshots",
+    "description": "First line of the table: Count is the number of snapshots read",
+    "other": "snapshots: {{.Snapshots}}"
+  },
+  {
+    "id": "jev.bench.column.recorded",
+    "description": "Row name of the settings the snapshots were captured under",
+    "other": "recorded"
+  },
+  {
+    "id": "jev.bench.column.setting",
+    "description": "Header of the setting column of the table",
+    "other": "SETTING"
+  },
+  {
+    "id": "jev.bench.column.kept",
+    "description": "Header of the kept calls column of the table",
+    "other": "KEPT"
+  },
+  {
+    "id": "jev.bench.column.truncated",
+    "description": "Header of the truncated calls column of the table",
+    "other": "TRUNCATED"
+  },
+  {
+    "id": "jev.bench.column.pruned",
+    "description": "Header of the pruned calls column of the table",
+    "other": "PRUNED"
+  },
+  {
+    "id": "jev.bench.column.unanswered",
+    "description": "Header of the unanswered calls column of the table",
+    "other": "UNANSWERED"
+  },
+  {
+    "id": "jev.bench.column.cached",
+    "description": "Header of the calls kept from the cache column of the table",
+    "other": "CACHED"
+  },
+  {
+    "id": "jev.bench.column.reverted",
+    "description": "Header of the reverted column of the table",
+    "other": "REVERTED"
+  },
+  {
+    "id": "jev.bench.column.chars",
+    "description": "Header of the characters reduction column of the table",
+    "other": "CHARS"
+  },
+  {
+    "id": "jev.bench.column.tokens",
+    "description": "Header of the tokens reduction column of the table",
+    "other": "TOKENS"
   }
 ]

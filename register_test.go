@@ -48,7 +48,7 @@ func TestEveryMessageRendersInEveryLanguage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewCatalog: %v", err)
 	}
-	params := map[string]any{"Count": 2, "Kept": 1, "Truncated": 0, "Pruned": 1, "Percent": 30, "Target": 25, "Reason": "x", "Requests": 3, "Tokens": 100, "Stage": "full", "State": 40000, "Request": 30000}
+	params := map[string]any{"Count": 2, "Snapshots": 1, "Path": "file.json", "Error": "reason", "Cause": "flag", "Line": 3, "Limit": 65536, "Kept": 1, "Truncated": 0, "Pruned": 1, "Percent": 30, "Target": 25, "Reason": "x", "Requests": 3, "Tokens": 100, "Stage": "full", "State": 40000, "Request": 30000}
 	for _, lang := range i18n.Languages() {
 		for _, key := range localeIDs(t, "en.json") {
 			text, err := catalog.Message(lang, key, params)

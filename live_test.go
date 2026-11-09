@@ -1,3 +1,5 @@
+//go:build live
+
 package jev
 
 import (
@@ -50,6 +52,15 @@ func applyEdit(call *contracts.HistoryCall, edit contracts.HistoryEdit) {
 	}
 }
 
+func fixtureHistory(t *testing.T) contracts.History {
+	t.Helper()
+	history, err := fixtureSnapshot(t).History.history()
+	if err != nil {
+		t.Fatalf("fixture history: %v", err)
+	}
+	return history
+}
+
 func TestLiveJevAnswersTheSessionHistory(t *testing.T) {
 	key := os.Getenv(typesafeEnv)
 	if key == "" {
@@ -59,7 +70,7 @@ func TestLiveJevAnswersTheSessionHistory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newCompactor: %v", err)
 	}
-	editor := &pruningHistory{history: sessionHistory()}
+	editor := &pruningHistory{history: fixtureHistory(t)}
 	before := toolRunes(editor.history)
 	result, err := stage.Compact(t.Context(), contracts.CompactRequest{History: editor}, nil)
 	if err != nil {
