@@ -108,6 +108,9 @@ history cannot be read or pruned, or when its context is cancelled.
 | `max_state_tokens` | `JEV_MAX_STATE_TOKENS` | `25000` | token budget of the state |
 | `max_request_tokens` | `JEV_MAX_REQUEST_TOKENS` | `30000` | token budget of one request |
 | `timeout` | `JEV_TIMEOUT` | `2m0s` | timeout of one request, as a Go duration |
+| `max_parallel` | `JEV_MAX_PARALLEL` | `4` | requests sent to Jev at once, at least 1 |
+| `on_short` | `JEV_ON_SHORT` | `keep` | `keep` leaves a short reduction to the next stage, `done` stops the stack there |
+| `dry_run` | `JEV_DRY_RUN` | `false` | `true` computes what Jev would prune and changes nothing |
 
 Tokens are estimated without a tokenizer, with the weights fast-jev calibrated
 against what Jev reports: a word costs one token per six letters, a digit half

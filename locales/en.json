@@ -50,6 +50,21 @@
     "other": "timeout of one Jev request, as a Go duration"
   },
   {
+    "id": "jev.setting.max_parallel",
+    "description": "Help of the max_parallel setting",
+    "other": "number of Jev requests sent at once, at least 1"
+  },
+  {
+    "id": "jev.setting.on_short",
+    "description": "Help of the on_short setting",
+    "other": "keep leaves a short reduction to the next stage, done stops the stack there"
+  },
+  {
+    "id": "jev.setting.dry_run",
+    "description": "Help of the dry_run setting",
+    "other": "true computes what Jev would prune and changes nothing"
+  },
+  {
     "id": "jev.note.failed",
     "description": "The Jev stage failed for Reason, pruned nothing and lets the next stage of the stack compact",
     "other": "Jev pruned nothing, the next stage compacts: {{.Reason}}"
@@ -75,5 +90,17 @@
     "description": "The Jev stage pruned Count tool calls, but the Percent percent it removed is below its Target percent, so the next stage runs",
     "one": "Jev pruned {{.Count}} tool call, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the next stage runs",
     "other": "Jev pruned {{.Count}} tool calls, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the next stage runs"
+  },
+  {
+    "id": "jev.note.pruned_stopped",
+    "description": "The Jev stage pruned Count tool calls, the Percent percent it removed is below its Target percent, and on_short=done stops the stack here",
+    "one": "Jev pruned {{.Count}} tool call, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the stack stops here",
+    "other": "Jev pruned {{.Count}} tool calls, the history is {{.Percent}}% smaller, short of the {{.Target}}% aimed for, so the stack stops here"
+  },
+  {
+    "id": "jev.note.dry_run",
+    "description": "The Jev stage would prune Count tool calls, but dry_run is set so nothing changed",
+    "one": "Jev would prune {{.Count}} tool call, dry run: the history is unchanged",
+    "other": "Jev would prune {{.Count}} tool calls, dry run: the history is unchanged"
   }
 ]

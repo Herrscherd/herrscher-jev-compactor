@@ -22,6 +22,9 @@ const (
 	settingMaxStateTokens   = "max_state_tokens"
 	settingMaxRequestTokens = "max_request_tokens"
 	settingTimeout          = "timeout"
+	settingMaxParallel      = "max_parallel"
+	settingOnShort          = "on_short"
+	settingDryRun           = "dry_run"
 )
 
 const (
@@ -35,7 +38,26 @@ const (
 	defaultMaxStateTokens   = 25000
 	defaultMaxRequestTokens = 30000
 	defaultTimeout          = 2 * time.Minute
+	defaultMaxParallel      = 4
+	defaultOnShort          = onShortKeep
 )
+
+type onShort uint8
+
+const (
+	onShortKeep onShort = iota + 1
+	onShortDone
+)
+
+func parseOnShort(text string) (onShort, bool) {
+	switch text {
+	case "keep":
+		return onShortKeep, true
+	case "done":
+		return onShortDone, true
+	}
+	return 0, false
+}
 
 // ErrInvalidSetting is returned when a setting of the stage holds a value it
 // does not accept. Match it with errors.Is.
@@ -94,6 +116,25 @@ type options struct {
 	maxStateTokens   int
 	maxRequestTokens int
 	timeout          time.Duration
+	maxParallel      int
+	onShort          onShort
+	dryRun           bool
+}
+
+func (o options) parallelism() int {
+	return orDefault(o.maxParallel, defaultMaxParallel)
+}
+
+func (o options) shortRule() onShort {
+	return orDefault(o.onShort, defaultOnShort)
+}
+
+func orDefault[T comparable](value, fallback T) T {
+	var zero T
+	if value == zero {
+		return fallback
+	}
+	return value
 }
 
 func settings(texts *messages) []contracts.Setting {
@@ -108,6 +149,9 @@ func settings(texts *messages) []contracts.Setting {
 		{Key: settingMaxStateTokens, Env: "JEV_MAX_STATE_TOKENS", Help: texts.english(helpStateBudget, nil), Default: strconv.Itoa(defaultMaxStateTokens)},
 		{Key: settingMaxRequestTokens, Env: "JEV_MAX_REQUEST_TOKENS", Help: texts.english(helpRequestBudget, nil), Default: strconv.Itoa(defaultMaxRequestTokens)},
 		{Key: settingTimeout, Env: "JEV_TIMEOUT", Help: texts.english(helpTimeout, nil), Default: defaultTimeout.String()},
+		{Key: settingMaxParallel, Env: "JEV_MAX_PARALLEL", Help: texts.english(helpMaxParallel, nil), Default: strconv.Itoa(defaultMaxParallel)},
+		{Key: settingOnShort, Env: "JEV_ON_SHORT", Help: texts.english(helpOnShort, nil), Default: "keep"},
+		{Key: settingDryRun, Env: "JEV_DRY_RUN", Help: texts.english(helpDryRun, nil), Default: "false"},
 	}
 }
 
@@ -128,6 +172,9 @@ func parseOptions(cfg contracts.PluginConfig) (options, error) {
 		maxStateTokens:   read.count(settingMaxStateTokens, defaultMaxStateTokens, 1),
 		maxRequestTokens: read.count(settingMaxRequestTokens, defaultMaxRequestTokens, 1),
 		timeout:          read.duration(settingTimeout, defaultTimeout),
+		maxParallel:      read.count(settingMaxParallel, 0, 1),
+		onShort:          read.onShort(),
+		dryRun:           read.flag(settingDryRun),
 	}
 	if read.err != nil {
 		return options{}, read.err
@@ -193,6 +240,32 @@ func (r *settingReader) count(key string, fallback, least int) int {
 	if err != nil || parsed < least {
 		r.refuse(key, value)
 		return 0
+	}
+	return parsed
+}
+
+func (r *settingReader) onShort() onShort {
+	value, ok := r.raw(settingOnShort)
+	if !ok {
+		return 0
+	}
+	parsed, valid := parseOnShort(value)
+	if !valid {
+		r.refuse(settingOnShort, value)
+		return 0
+	}
+	return parsed
+}
+
+func (r *settingReader) flag(key string) bool {
+	value, ok := r.raw(key)
+	if !ok {
+		return false
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		r.refuse(key, value)
+		return false
 	}
 	return parsed
 }

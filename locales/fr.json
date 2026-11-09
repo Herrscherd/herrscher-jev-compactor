@@ -50,6 +50,21 @@
     "other": "délai d'une requête Jev, en durée Go"
   },
   {
+    "id": "jev.setting.max_parallel",
+    "description": "Help of the max_parallel setting",
+    "other": "nombre de requêtes Jev envoyées en même temps, au moins 1"
+  },
+  {
+    "id": "jev.setting.on_short",
+    "description": "Help of the on_short setting",
+    "other": "keep laisse une réduction insuffisante à l'étape suivante, done arrête la pile à cet endroit"
+  },
+  {
+    "id": "jev.setting.dry_run",
+    "description": "Help of the dry_run setting",
+    "other": "true calcule ce que Jev élaguerait sans rien modifier"
+  },
+  {
     "id": "jev.note.failed",
     "description": "The Jev stage failed for Reason, pruned nothing and lets the next stage of the stack compact",
     "other": "Jev n'a rien élagué, l'étape suivante compacte : {{.Reason}}"
@@ -75,5 +90,17 @@
     "description": "The Jev stage pruned Count tool calls, but the Percent percent it removed is below its Target percent, so the next stage runs",
     "one": "Jev a élagué {{.Count}} appel d'outil, l'historique est plus court de {{.Percent}} %, sous les {{.Target}} % visés, donc l'étape suivante s'exécute",
     "other": "Jev a élagué {{.Count}} appels d'outil, l'historique est plus court de {{.Percent}} %, sous les {{.Target}} % visés, donc l'étape suivante s'exécute"
+  },
+  {
+    "id": "jev.note.pruned_stopped",
+    "description": "The Jev stage pruned Count tool calls, the Percent percent it removed is below its Target percent, and on_short=done stops the stack here",
+    "one": "Jev a élagué {{.Count}} appel d'outil, l'historique est plus court de {{.Percent}} %, sous les {{.Target}} % visés, la pile s'arrête ici",
+    "other": "Jev a élagué {{.Count}} appels d'outil, l'historique est plus court de {{.Percent}} %, sous les {{.Target}} % visés, la pile s'arrête ici"
+  },
+  {
+    "id": "jev.note.dry_run",
+    "description": "The Jev stage would prune Count tool calls, but dry_run is set so nothing changed",
+    "one": "Jev élaguerait {{.Count}} appel d'outil, essai à blanc : l'historique reste inchangé",
+    "other": "Jev élaguerait {{.Count}} appels d'outil, essai à blanc : l'historique reste inchangé"
   }
 ]

@@ -24,11 +24,16 @@ const (
 	helpStateBudget    = "jev.setting.max_state_tokens"
 	helpRequestBudget  = "jev.setting.max_request_tokens"
 	helpTimeout        = "jev.setting.timeout"
+	helpMaxParallel    = "jev.setting.max_parallel"
+	helpOnShort        = "jev.setting.on_short"
+	helpDryRun         = "jev.setting.dry_run"
 	noteFailed         = "jev.note.failed"
 	noteNoHistory      = "jev.note.no_history"
 	noteNothingToPrune = "jev.note.nothing_to_prune"
 	notePruned         = "jev.note.pruned"
 	notePrunedShort    = "jev.note.pruned_short"
+	notePrunedStopped  = "jev.note.pruned_stopped"
+	noteDryRun         = "jev.note.dry_run"
 )
 
 type messages struct {
